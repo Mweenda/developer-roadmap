@@ -26,18 +26,34 @@ export const projectMilestones = [
   '10 · Production',
 ];
 
+export const landingCards = [
+  {
+    question: 'What should I learn next?',
+    evidence: 'Mock snapshot: Phase 0 · Developer environment. Next lesson: the terminal. The queue is the current gate, not a page you opened.',
+  },
+  {
+    question: 'Do I actually understand this?',
+    evidence: 'Mock snapshot: 0 lessons evidenced, 0 exercises passed, quiz 0%. Opening a lesson stays LEARNING until you practice.',
+  },
+  {
+    question: 'Where am I weak?',
+    evidence: 'Mock snapshot: no weak concepts yet. Missed exercises and quizzes will list the idea here — empty means no failures yet.',
+  },
+  {
+    question: 'Am I ready to move forward?',
+    evidence: 'Mock snapshot: Phase 0 stays locked until the lesson, exercises, and quiz pass. Visiting the roadmap does not unlock Phase 1.',
+  },
+];
+
 export const landing = {
   eyebrow: 'Personal software-engineering apprenticeship',
   title: 'Learn, practice, prove it, then move on.',
   lede: 'This is not a course catalog. Fieldnotes turns the full-stack JavaScript roadmap into a gated apprenticeship: fundamentals before frameworks, evidence before mastery.',
-  bullets: [
-    'What should I learn next?',
-    'Do I actually understand this?',
-    'Where am I weak?',
-    'Am I ready to move forward?',
-  ],
+  cards: landingCards,
+  bullets: landingCards.map((card) => card.question),
   primary: { href: '#/register', label: 'Create your learner account' },
   secondary: { href: '#/login', label: 'Sign in' },
+  continue: { href: '#/overview', label: 'Continue your apprenticeship' },
 };
 
 export function listShell() {

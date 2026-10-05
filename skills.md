@@ -103,6 +103,7 @@ That is the test gate. GitHub Actions runs the same command on every push and pu
 | `test/account.test.js` | Profile is in the avatar menu, not the sidebar; Settings and Sign out live there too |
 | `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
 | `test/firebase-hosting.test.js` | Hosting rewrites `/api`; App Hosting uses Firestore; `__session` cookie |
+| `test/landing.test.js` | Root URL is public landing first; `#/overview` is the authenticated home; evidence cards are unique |
 | `test/vercel.test.js` | Vercel Express entry; CDN `public/` copy; Firebase config kept as fallback |
 | `e2e/portal.spec.js` | Playwright: landing, `/api`, `__session`, register, Phase 0, journal, sign-out |
 

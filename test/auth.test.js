@@ -76,6 +76,10 @@ test('landing copy is data, not a hardcoded page component', async (t) => {
   assert.match(shell.landing.title, /practice, prove/i);
   assert.match(shell.landing.eyebrow, /apprenticeship/i);
   assert.ok(shell.landing.bullets.length >= 3);
+  assert.ok(shell.landing.cards.length >= 4);
+  const evidence = new Set(shell.landing.cards.map((card) => card.evidence));
+  assert.equal(evidence.size, shell.landing.cards.length);
+  assert.equal([...evidence].includes('The portal answers this from evidence, not from pages opened.'), false);
   const home = await call('/');
   assert.equal(home.status, 200);
   assert.match(await home.text(), /fieldnotes/);

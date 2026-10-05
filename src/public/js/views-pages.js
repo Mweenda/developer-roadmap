@@ -304,9 +304,11 @@ export function renderLanding() {
         <div class="eyebrow">${escapeHtml(land.eyebrow ?? '')}</div>
         <h1>${escapeHtml(land.title ?? 'Fieldnotes')}</h1>
         <p class="lede">${escapeHtml(land.lede ?? '')}</p>
-        <div class="landing-grid">${(land.bullets ?? []).map((item) => `<div class="feature-card"><b>${escapeHtml(item)}</b><span>The portal answers this from evidence, not from pages opened.</span></div>`).join('')}</div>
+        <div class="landing-grid">${(land.cards ?? []).map((card) => `<div class="feature-card"><b>${escapeHtml(card.question)}</b><span>${escapeHtml(card.evidence)}</span></div>`).join('')}</div>
         <div class="actions">
-          <a class="button primary" href="${escapeHtml(land.primary?.href ?? '#/register')}">${escapeHtml(land.primary?.label ?? 'Register')} <span>→</span></a>
+          ${store.session
+            ? `<a class="button primary" href="${escapeHtml(land.continue?.href ?? '#/overview')}">${escapeHtml(land.continue?.label ?? 'Continue')} <span>→</span></a>`
+            : `<a class="button primary" href="${escapeHtml(land.primary?.href ?? '#/register')}">${escapeHtml(land.primary?.label ?? 'Register')} <span>→</span></a>`}
           <a class="button secondary" href="${escapeHtml(land.secondary?.href ?? '#/login')}">${escapeHtml(land.secondary?.label ?? 'Sign in')}</a>
         </div>
       </article>
@@ -357,7 +359,7 @@ function bindAuthForm(url) {
       });
       store.session = body.user;
       await loadWorkspace();
-      location.hash = '#/';
+      location.hash = '#/overview';
       await hooks.render();
     } catch (error) {
       showNotice(error.message);

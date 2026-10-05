@@ -113,8 +113,8 @@ export function updateChrome() {
     ? 'roadmap'
     : route.name === 'doc' || route.name === 'source' ? 'docs'
       : route.name.startsWith('journal') ? 'journal'
-        : route.name === 'git' || route.name === 'lab' ? route.name
-          : route.name;
+        : route.name === 'git' || route.name === 'lab' || route.name === 'overview' ? route.name
+          : '';
   document.querySelectorAll('#sidebarNav a').forEach((link) => {
     link.classList.toggle('selected', link.dataset.nav === current);
   });

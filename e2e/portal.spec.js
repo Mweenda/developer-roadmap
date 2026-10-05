@@ -36,7 +36,12 @@ test.describe.serial('apprenticeship portal', () => {
 
   test('landing, register, dashboard, and session match local', async ({ page, context }) => {
     await page.goto('/');
+    await expect(page.locator('body')).toHaveClass(/public/);
     await expect(page.locator('#view h1')).toContainText('Learn, practice, prove it, then move on.');
+    await expect(page.locator('.sidebar')).toBeHidden();
+    await expect(page.getByText('YOUR WORKSPACE')).toBeHidden();
+    await expect(page.locator('#view h1')).not.toContainText('Start Phase 0.');
+    await expect(page.locator('.feature-card span').first()).toContainText('Mock snapshot');
     await expect(page.getByRole('link', { name: /Create your learner account/i })).toHaveAttribute('href', '#/register');
     await page.goto('/#/register');
     await expect(page.locator('#view h1')).toContainText('Register to start Phase 0.');
@@ -44,6 +49,7 @@ test.describe.serial('apprenticeship portal', () => {
     await page.locator('#username').fill(user.username);
     await page.locator('#password').fill(user.password);
     await page.getByRole('button', { name: /Create account/i }).click({ force: true });
+    await expect(page).toHaveURL(/#\/overview/);
     await expect(page.locator('#view h1')).toContainText('Start Phase 0.');
     const cookies = await context.cookies();
     const session = cookies.find((cookie) => cookie.name === '__session');
@@ -51,7 +57,11 @@ test.describe.serial('apprenticeship portal', () => {
     expect(session?.httpOnly).toBe(true);
     if (page.url().startsWith('https://')) expect(session?.secure).toBe(true);
 
-    await page.reload();
+    await page.goto('/');
+    await expect(page.locator('body')).toHaveClass(/public/);
+    await expect(page.locator('#view h1')).toContainText('Learn, practice, prove it, then move on.');
+    await expect(page.locator('.sidebar')).toBeHidden();
+    await page.goto('/#/overview');
     await expect(page.locator('#view h1')).toContainText('Start Phase 0.');
     await expect(page.locator('#tutorFab')).toBeVisible();
   });
@@ -61,6 +71,7 @@ test.describe.serial('apprenticeship portal', () => {
     await page.locator('#username').fill(user.username);
     await page.locator('#password').fill(user.password);
     await page.getByRole('button', { name: /Sign in/i }).click({ force: true });
+    await expect(page).toHaveURL(/#\/overview/);
     await expect(page.locator('#view h1')).toContainText('Start Phase 0.');
     await page.goto('/#/phase/environment/learn/environment__terminal');
     await expect(page.getByRole('button', { name: 'Mark lesson complete' })).toBeVisible();
@@ -93,6 +104,7 @@ test.describe.serial('apprenticeship portal', () => {
     await page.locator('#username').fill(user.username);
     await page.locator('#password').fill(user.password);
     await page.getByRole('button', { name: /Sign in/i }).click({ force: true });
+    await expect(page).toHaveURL(/#\/overview/);
     await expect(page.locator('#view h1')).toContainText(/Start Phase 0|Learn:/);
     await page.locator('#accountBtn').click({ force: true });
     await page.locator('[data-logout]').click({ force: true });
@@ -101,6 +113,7 @@ test.describe.serial('apprenticeship portal', () => {
     await page.locator('#username').fill(user.username);
     await page.locator('#password').fill(user.password);
     await page.getByRole('button', { name: /Sign in/i }).click({ force: true });
+    await expect(page).toHaveURL(/#\/overview/);
     await expect(page.locator('#view h1')).toContainText(/Start Phase 0|Learn:/);
     await page.goto(`/#/phase/environment/learn/environment__terminal`);
     await expect(page.getByRole('button', { name: 'Mark unread' })).toBeVisible();

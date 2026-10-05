@@ -1,6 +1,6 @@
 import { escapeHtml } from './js/html.js';
 import { request } from './js/api.js';
-import { parseRoute } from './js/router.js';
+import { parseRoute, isPublicRoute } from './js/router.js';
 import { runCodeExercise } from './js/runner-client.js';
 import {
   store, hooks, bindShell, showNotice, loadLearning, loadPhase, reportFor, loadWorkspace,
@@ -19,23 +19,48 @@ import {
   renderRoadmap, renderPhaseGuide, renderTopic, renderExercise, renderQuiz,
 } from './js/views-learn.js';
 
+let appBound = false;
+
+async function ensureWorkspace() {
+  if (!store.session) return;
+  if (!store.phases.length) await loadWorkspace();
+  if (appBound) return;
+  appBound = true;
+  bindTutor();
+  bindCelebrate();
+  bindAccountMenu();
+  bindExerciseBrief();
+  request('/api/config').then((runtime) => bindFirebase(runtime.firebase)).catch(() => {});
+}
+
 async function render() {
   showNotice('');
   const route = parseRoute();
   try {
-    if (!store.session) {
+    if (isPublicRoute(route)) {
+      if (store.session && (route.name === 'login' || route.name === 'register')) {
+        location.hash = '#/overview';
+        await ensureWorkspace();
+        document.body.classList.remove('public');
+        setTutorVisible(true);
+        return renderOverview();
+      }
       document.body.classList.add('public');
       setTutorVisible(false);
       if (route.name === 'login') return renderLogin();
       if (route.name === 'register') return renderRegister();
+      if (!store.shell.landing) return undefined;
       return renderLanding();
     }
+    if (!store.session) {
+      document.body.classList.add('public');
+      setTutorVisible(false);
+      if (!store.shell.landing) return undefined;
+      return renderLanding();
+    }
+    await ensureWorkspace();
     document.body.classList.remove('public');
     setTutorVisible(true);
-    if (route.name === 'login' || route.name === 'register') {
-      location.hash = '#/';
-      return renderOverview();
-    }
     if (route.name === 'map') return renderMap();
     if (route.name === 'git') return renderGit();
     if (route.name === 'lab') return renderDebugLab();
@@ -72,31 +97,38 @@ async function render() {
   }
 }
 
+function failBoot(error) {
+  if (!document.body.classList.contains('public')) {
+    store.view.innerHTML = '<div class="loading">Could not load the roadmap. Start the app with <code>pnpm dev</code> and refresh.</div>';
+  }
+  showNotice(`Backend unavailable: ${error.message}`);
+}
+
+async function bootstrap() {
+  const [shell, me] = await Promise.all([request('/api/shell'), request('/api/auth/me')]);
+  store.shell = shell;
+  store.session = me.user;
+}
+
 async function init() {
   bindShell();
   hooks.render = render;
+  document.body.classList.add('public');
+  const route = parseRoute();
+  if (isPublicRoute(route)) {
+    bootstrap().then(() => render()).catch(failBoot);
+    return;
+  }
   try {
-    store.shell = await request('/api/shell');
-    store.session = (await request('/api/auth/me')).user;
-    bindTutor();
-    bindCelebrate();
-    bindAccountMenu();
-    bindExerciseBrief();
-    try {
-      const runtime = await request('/api/config');
-      await bindFirebase(runtime.firebase);
-    } catch {
-      // Analytics is optional; the apprenticeship still runs.
-    }
-    if (store.session) await loadWorkspace();
+    await bootstrap();
+    if (store.session) await ensureWorkspace();
     await render();
   } catch (error) {
-    store.view.innerHTML = '<div class="loading">Could not load the roadmap. Start the app with <code>pnpm dev</code> and refresh.</div>';
-    showNotice(`Backend unavailable: ${error.message}`);
+    failBoot(error);
   }
 }
 
 window.addEventListener('hashchange', () => { render(); });
 init();
 
-export { runCodeExercise, parseRoute };
+export { runCodeExercise, parseRoute, isPublicRoute };

@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14182c"><title>Fieldnotes — Developer Roadmap</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
 </head>
-<body>
+<body class="public">
   <div class="app-aurora" aria-hidden="true"></div>
-  <aside class="sidebar"><a class="brand" href="#/"><span class="brand-mark">{ }</span><span><b>fieldnotes</b><small>developer apprenticeship</small></span></a>
+  <aside class="sidebar"><a class="brand" href="#/overview"><span class="brand-mark">{ }</span><span><b>fieldnotes</b><small>developer apprenticeship</small></span></a>
     <p class="nav-label">YOUR WORKSPACE</p>
     <nav id="sidebarNav">
-      <a data-nav="overview" href="#/">⌂ <span>Overview</span></a>
+      <a data-nav="overview" href="#/overview">⌂ <span>Overview</span></a>
       <a data-nav="roadmap" href="#/roadmap">▤ <span>Roadmap</span></a>
       <a data-nav="journal" href="#/journal">✎ <span>Journal</span></a>
       <a data-nav="map" href="#/map">◈ <span>Knowledge map</span></a>
@@ -27,7 +29,7 @@
     <header class="topbar">
       <div>Apprenticeship <span>/</span> <b>Full-stack JavaScript</b></div>
       <nav class="mobile-nav" aria-label="Mobile">
-        <a href="#/">Home</a>
+        <a href="#/overview">Home</a>
         <a href="#/roadmap">Roadmap</a>
         <a href="#/journal">Journal</a>
         <a href="#/lab">Lab</a>
@@ -40,7 +42,25 @@
     </header>
     <div class="wrap">
       <div id="notice" class="notice" role="status" hidden></div>
-      <div id="view"><div class="loading">Loading the apprenticeship…</div></div>
+      <div id="view">
+        <section class="landing">
+          <article class="landing-card">
+            <div class="eyebrow">Personal software-engineering apprenticeship</div>
+            <h1>Learn, practice, prove it, then move on.</h1>
+            <p class="lede">This is not a course catalog. Fieldnotes turns the full-stack JavaScript roadmap into a gated apprenticeship: fundamentals before frameworks, evidence before mastery.</p>
+            <div class="landing-grid">
+              <div class="feature-card"><b>What should I learn next?</b><span>Mock snapshot: Phase 0 · Developer environment. Next lesson: the terminal. The queue is the current gate, not a page you opened.</span></div>
+              <div class="feature-card"><b>Do I actually understand this?</b><span>Mock snapshot: 0 lessons evidenced, 0 exercises passed, quiz 0%. Opening a lesson stays LEARNING until you practice.</span></div>
+              <div class="feature-card"><b>Where am I weak?</b><span>Mock snapshot: no weak concepts yet. Missed exercises and quizzes will list the idea here — empty means no failures yet.</span></div>
+              <div class="feature-card"><b>Am I ready to move forward?</b><span>Mock snapshot: Phase 0 stays locked until the lesson, exercises, and quiz pass. Visiting the roadmap does not unlock Phase 1.</span></div>
+            </div>
+            <div class="actions">
+              <a class="button primary" href="#/register">Create your learner account <span>→</span></a>
+              <a class="button secondary" href="#/login">Sign in</a>
+            </div>
+          </article>
+        </section>
+      </div>
     </div>
   </main>
   <button id="tutorFab" class="tutor-fab" type="button" aria-controls="tutorPanel" aria-expanded="false" hidden>
