@@ -17,6 +17,7 @@ export const store = {
   reviewCriteria: [],
   projectReviews: {},
   hints: {},
+  briefsSeen: new Set(),
   phaseCache: new Map(),
 };
 
@@ -31,8 +32,8 @@ export function showNotice(message) {
 }
 
 export function initials(name) {
-  if (!name) return '?';
-  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || '?';
+  if (!name) return '';
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
 }
 
 export function applyProgress(next) {
@@ -91,8 +92,10 @@ export function nextPhase() {
 }
 
 export function updateChrome() {
-  const count = store.progress.completed.length;
-  const percent = store.phases.length ? Math.round((count / store.phases.length) * 100) : 0;
+  const snapshot = store.learning;
+  const percent = snapshot?.overall?.progressPercent
+    ?? (store.phases.length ? Math.round((store.progress.completed.length / store.phases.length) * 100) : 0);
+  const count = snapshot?.overall?.completed ?? store.progress.completed.length;
   const streak = document.querySelector('#streak');
   if (streak) streak.textContent = count;
   const percentEl = document.querySelector('#percent');
@@ -103,7 +106,7 @@ export function updateChrome() {
   if (meter) meter.style.width = `${percent}%`;
   if (completed) completed.textContent = count;
   if (total) total.textContent = store.phases.length;
-  const avatar = document.querySelector('#avatar');
+  const avatar = document.querySelector('#accountBtn');
   if (avatar) avatar.textContent = initials(store.session?.name ?? store.progress.learner?.name);
   const route = parseRoute();
   const current = route.name === 'topic' || route.name === 'exercise' || route.name === 'quiz' || route.name === 'phase'

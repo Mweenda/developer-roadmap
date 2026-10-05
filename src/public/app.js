@@ -7,10 +7,17 @@ import {
 } from './js/store.js';
 import {
   renderOverview, renderDocs, renderSource, renderDoc, renderProjects, renderMap,
-  renderHabits, renderGit, renderDebugLab, renderProfile, renderLanding, renderRegister, renderLogin,
+  renderHabits, renderGit, renderDebugLab, renderProfile, renderSettings, renderLanding, renderRegister, renderLogin,
 } from './js/views-pages.js';
 import { renderJournal, renderJournalPhase, renderJournalEditor } from './js/views-journal.js';
 import { bindTutor, setTutorVisible } from './js/chatbot.js';
+import { bindCelebrate } from './js/celebrate.js';
+import { bindAccountMenu } from './js/account-menu.js';
+import { bindExerciseBrief } from './js/exercise-brief.js';
+import { bindFirebase } from './js/firebase-client.js';
+import {
+  renderRoadmap, renderPhaseGuide, renderTopic, renderExercise, renderQuiz,
+} from './js/views-learn.js';
 
 async function render() {
   showNotice('');
@@ -38,6 +45,10 @@ async function render() {
     if (route.name === 'profile') {
       await loadLearning();
       return renderProfile();
+    }
+    if (route.name === 'settings') {
+      await loadLearning();
+      return renderSettings();
     }
     if (route.name === 'journal') return renderJournal();
     if (route.name === 'journal-phase') return renderJournalPhase(route.phaseId);
@@ -68,6 +79,15 @@ async function init() {
     store.shell = await request('/api/shell');
     store.session = (await request('/api/auth/me')).user;
     bindTutor();
+    bindCelebrate();
+    bindAccountMenu();
+    bindExerciseBrief();
+    try {
+      const runtime = await request('/api/config');
+      await bindFirebase(runtime.firebase);
+    } catch {
+      // Analytics is optional; the apprenticeship still runs.
+    }
     if (store.session) await loadWorkspace();
     await render();
   } catch (error) {

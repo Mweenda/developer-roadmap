@@ -113,7 +113,11 @@ test('a phase auto-completes after its exercises and quiz are passed', async (t)
   for (const exercise of phase.exercises) {
     const body = exercise.type === 'build'
       ? { completed: true }
-      : { selected: exercise.answer };
+      : exercise.type === 'terminal'
+        ? { commands: exercise.expectedCommands }
+        : exercise.type === 'code'
+          ? { passed: true }
+          : { selected: exercise.answer };
     const response = await call(`/api/exercises/${exercise.id}/submit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

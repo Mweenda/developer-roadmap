@@ -99,6 +99,29 @@ test('tutor API requires a session, stays on curriculum, and sends Gemini a guid
   assert.equal(calls.length, 1);
 });
 
+test('askTutor falls back when the configured Gemini model is shut down', async () => {
+  const calls = [];
+  const geminiFetch = async (url) => {
+    calls.push(url);
+    if (url.includes('gemini-2.0-flash')) {
+      return { ok: false, status: 404, async json() { return { error: { message: 'no longer available' } }; } };
+    }
+    return {
+      ok: true,
+      async json() {
+        return { candidates: [{ content: { parts: [{ text: 'What do you expect map to return for each element?' }] } }] };
+      },
+    };
+  };
+  const reply = await askTutor(
+    { question: 'Why does map return undefined names?', phaseId: 'javascript-core' },
+    { apiKey: 'test-key', model: 'gemini-2.0-flash', fetchImpl: geminiFetch },
+  );
+  assert.match(reply.text, /map/i);
+  assert.ok(calls.some((url) => url.includes('gemini-2.0-flash')));
+  assert.ok(calls.some((url) => /gemini-3\.[58]-flash|gemini-flash-latest/.test(url)));
+});
+
 test('askTutor uses the injected fetch and never treats a missing key as success', async () => {
   await assert.rejects(
     () => askTutor({ question: 'Why is filter not changing the array?', phaseId: 'javascript-core' }, { apiKey: '' }),

@@ -4,7 +4,7 @@ Source of truth: [`docs/MVP_Spec.pdf`](docs/MVP_Spec.pdf). Companion: [`docs/PRO
 
 ## Git branches
 
-Work on **`dev`**. **`main` is only updated by merging `dev`.** Never commit feature work directly to `main`. Never merge `main` into `dev` as a substitute for finishing work on `dev`. Pull requests and deploys flow `dev` → `main`.
+Work on **`dev`**. **`main` is only updated by merging `dev`.** Never commit feature work directly to `main`. Never merge `main` into `dev` as a substitute for finishing work on `dev`. Pull requests flow `dev` → `main`. After the ship gate below, push `dev` to GitHub and deploy Firebase Hosting’s **live** channel from that branch.
 
 ## Hard rule
 
@@ -82,7 +82,7 @@ Run from the repository root:
 pnpm test
 ```
 
-That is the only merge gate. GitHub Actions runs the same command on every push and pull request to `main` and `dev`. **If a test fails, stop. Tweak the implementation or the test until `pnpm test` is green, then continue.** Do not push, deploy, or start the next milestone on a red suite.
+That is the test gate. GitHub Actions runs the same command on every push and pull request to `main` and `dev`. **If a test fails, stop. Tweak the implementation or the test until `pnpm test` is green, then continue.** Do not push, deploy, or start the next milestone on a red suite.
 
 | File | What it proves |
 | --- | --- |
@@ -97,9 +97,30 @@ That is the only merge gate. GitHub Actions runs the same command on every push 
 | `test/mvp.test.js` | JS fundamentals headings, “Start Phase 0.” |
 | `test/progress.test.js` | Progress store persistence and validation |
 | `test/roadmap.test.js` | 17 phases and javascript-core content |
+| `test/celebrate.test.js` | Pass fireworks, center insight dialog, back/proceed locked until the stage is done |
+| `test/studio.test.js` | Start Phase opens lesson studio; chatbot is a corner icon, not a nav `?` |
 | `test/tutor.test.js` | Gemini tutor: chapter docs, no spoilers, auth, chatbot widget, `.env` ignored |
+| `test/account.test.js` | Profile is in the avatar menu, not the sidebar; Settings and Sign out live there too |
+| `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
 
 Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
+
+## Ship gate
+
+Whenever a feature is implemented successfully, ship it. Do not leave finished work uncommitted on the machine.
+
+1. `pnpm test` is green.
+2. `pnpm build` completes with **no chunking errors**.
+3. If the build or `test/size.test.js` reports a public JS file over **32KB** or `src/public/styles.css` over **48KB**, **stop**. Split `src/public` into smaller ES modules until every chunk is under the limit and the suite is green. Do not raise the size cap to make the error go away.
+4. Commit on **`dev`** (never `.env`, `data/users.json`, or API keys).
+5. Push to GitHub: `git push -u origin HEAD`.
+6. Deploy to the Firebase Hosting **live** channel for `fieldnotes-apprenticeship`:
+
+```sh
+firebase hosting:channel:deploy live --project fieldnotes-apprenticeship
+```
+
+Do not deploy a static-only `public/` folder that drops the Express `/api`. The live site must still run the apprenticeship server. Skip push and deploy if tests or chunk limits fail.
 
 ## Housekeeping
 

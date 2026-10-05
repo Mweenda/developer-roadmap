@@ -1,4 +1,8 @@
 import { tutor } from './tutor.js';
+import { studio } from './studio.js';
+import { celebrate } from './celebrate.js';
+import { accountMenu, profilePage, settingsPage } from './account.js';
+import { exerciseUi } from './exercise-brief.js';
 
 export const habits = [
   { title: 'Foundations before frameworks', body: 'JavaScript → browser → HTTP → Node → database → React. Do not use a framework to skip a fundamental.' },
@@ -37,5 +41,5 @@ export const landing = {
 };
 
 export function listShell() {
-  return { habits, projectMilestones, landing, tutor };
+  return { habits, projectMilestones, landing, tutor, studio, celebrate, accountMenu, profilePage, settingsPage, exerciseUi };
 }

@@ -20,7 +20,7 @@ test('progress store starts empty, persists updates, and validates phase ids', a
   const saved = await store.update('javascript-core', true);
   assert.deepEqual(saved.completed, ['javascript-core']);
   assert.ok(saved.updatedAt);
-  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).completed, ['javascript-core']);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).byUser.default.completed, ['javascript-core']);
   assert.deepEqual((await store.update('javascript-core', false)).completed, []);
   await assert.rejects(store.update('unknown-phase', true), { code: 'INVALID_PHASE' });
 

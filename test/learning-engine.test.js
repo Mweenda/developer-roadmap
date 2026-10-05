@@ -20,6 +20,18 @@ test('learning snapshot names the next action and does not treat an opened lesso
   assert.equal(empty.phases.find((phase) => phase.id === 'react').unlocked, false);
   assert.equal(empty.action.title, 'Start Phase 0.');
   assert.equal(empty.current.mastery, 0);
+  assert.equal(empty.overall.progressPercent, 0);
+  assert.match(empty.action.href, /\/phase\/environment\/learn\//);
+
+  const afterSection = buildLearningSnapshot({
+    completed: [],
+    topics: ['environment__terminal'],
+    exercises: {},
+    quizzes: {},
+    misses: {},
+    reviews: {},
+  });
+  assert.ok(afterSection.overall.progressPercent > 0);
 
   const afterRead = buildLearningSnapshot({
     completed: [],
@@ -39,6 +51,7 @@ test('a mastered phase becomes REVIEW_DUE when the scheduled review arrives', ()
     topics: ['environment__terminal', 'environment__git', 'environment__runtime'],
     exercises: {
       environment__commands: { completed: true, passed: true, attempts: 1 },
+      environment__shell: { completed: true, passed: true, attempts: 1 },
       environment__hello: { completed: true, passed: true, attempts: 1 },
     },
     quizzes: { environment: { score: 100, passed: true, attempts: 1, missed: [] } },

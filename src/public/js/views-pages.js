@@ -19,7 +19,7 @@ export async function renderOverview() {
       </div>
       <article class="progress-card">
         <div class="tiny-label">PROGRESS / MASTERY</div>
-        <div class="percent"><strong id="percent">${snapshot.overall.progressPercent}%</strong><span>phases complete · ${snapshot.overall.masteryPercent}% mastery</span></div>
+        <div class="percent"><strong id="percent">${snapshot.overall.progressPercent}%</strong><span>sections complete · ${snapshot.overall.masteryPercent}% mastery</span></div>
         <div class="meter"><i id="meter" style="width:${snapshot.overall.progressPercent}%"></i></div>
         <div class="progress-detail"><span><b id="completed">${snapshot.overall.completed}</b> of <b id="total">${snapshot.overall.total}</b> phases</span><span>${current ? escapeHtml(current.state.replaceAll('_', ' ')) : 'MASTERED'}</span></div>
       </article>
@@ -239,27 +239,38 @@ export async function renderDebugLab() {
 
 export function renderProfile() {
   const snapshot = store.learning;
-  store.view.innerHTML = `<div class="section-title"><div><div class="eyebrow">Signed in as ${escapeHtml(store.session?.username ?? '')}</div><h1>Profile & settings</h1></div></div>
-    <p class="lede">Change the name the portal uses. Sign out when you leave this machine.</p>
-    <article class="panel">
-      <form id="profileForm">
-        <label class="editor-label" for="learnerName">Display name</label>
-        <input id="learnerName" name="name" class="editor auth-input" value="${escapeHtml(store.progress.learner?.name ?? store.session?.name ?? '')}" required maxlength="80">
-        <div class="phase-actions">
-          <button class="primary-btn" type="submit">Save</button>
-          <button type="button" id="logoutBtn">Sign out</button>
-        </div>
-      </form>
-    </article>
+  const page = store.shell.profilePage ?? {};
+  store.view.innerHTML = `<div class="section-title"><div><div class="eyebrow">${escapeHtml(page.eyebrowPrefix ?? 'Signed in as')} ${escapeHtml(store.session?.username ?? '')}</div><h1>${escapeHtml(page.title ?? 'Profile')}</h1></div></div>
+    <p class="lede">${escapeHtml(page.lede ?? '')}</p>
     <div class="stat-row">
       <article class="panel"><b>${snapshot?.overall?.completed ?? 0}</b><span>phases complete</span></article>
       <article class="panel"><b>${snapshot?.overall?.masteryPercent ?? 0}%</b><span>mastery</span></article>
       <article class="panel"><b>${snapshot?.thresholds?.quizPass ?? 70}%</b><span>quiz pass bar</span></article>
       <article class="panel"><b>${snapshot?.thresholds?.quizMastery ?? 80}%</b><span>mastery bar</span></article>
     </div>
+    <div class="phase-actions">
+      <a class="button secondary" href="${escapeHtml(page.settingsHref ?? '#/settings')}">${escapeHtml(page.settingsLabel ?? 'Open settings')}</a>
+    </div>`;
+  updateChrome();
+}
+
+export function renderSettings() {
+  const page = store.shell.settingsPage ?? {};
+  store.view.innerHTML = `<div class="section-title"><div><div class="eyebrow">${escapeHtml(page.eyebrow ?? 'Account')}</div><h1>${escapeHtml(page.title ?? 'Settings')}</h1></div></div>
+    <p class="lede">${escapeHtml(page.lede ?? '')}</p>
     <article class="panel">
-      <div class="panel-title"><h3>Local backups</h3><span>M20</span></div>
-      <p>Copy <code>data/</code> and <code>journal/</code> for a snapshot. Auth cookies stay on this machine. The API never evaluates learner code.</p>
+      <form id="profileForm">
+        <label class="editor-label" for="learnerName">${escapeHtml(page.nameLabel ?? 'Display name')}</label>
+        <input id="learnerName" name="name" class="editor auth-input" value="${escapeHtml(store.progress.learner?.name ?? store.session?.name ?? '')}" required maxlength="80">
+        <div class="phase-actions">
+          <button class="primary-btn" type="submit">${escapeHtml(page.saveLabel ?? 'Save')}</button>
+          <button type="button" id="logoutBtn">${escapeHtml(page.signOutLabel ?? 'Sign out')}</button>
+        </div>
+      </form>
+    </article>
+    <article class="panel">
+      <div class="panel-title"><h3>${escapeHtml(page.backupsTitle ?? 'Local backups')}</h3><span>${escapeHtml(page.backupsMilestone ?? 'M20')}</span></div>
+      <p>${escapeHtml(page.backups ?? '')}</p>
     </article>`;
   store.view.querySelector('#profileForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -272,7 +283,7 @@ export function renderProfile() {
       applyProgress(saved);
       if (saved.user) store.session = saved.user;
       showNotice('Profile saved.');
-      renderProfile();
+      renderSettings();
     } catch (error) {
       showNotice(error.message);
     }

@@ -20,7 +20,6 @@
       <a data-nav="git" href="#/git">⎇ <span>Git workflow</span></a>
       <a data-nav="lab" href="#/lab">🪲 <span>Debug lab</span></a>
       <a data-nav="habits" href="#/habits">⌘ <span>Engineering habits</span></a>
-      <a data-nav="profile" href="#/profile">☺ <span>Profile</span></a>
     </nav>
     <div class="sidebar-foot"><span class="tiny-label">YOUR MOMENTUM</span><div class="streak glass">✦ <b id="streak">0</b> phases finished<small>Lessons, exercises, and quizzes save on this server.</small></div></div>
   </aside>
@@ -34,14 +33,22 @@
         <a href="#/lab">Lab</a>
         <a href="#/docs">Library</a>
       </nav>
-      <div id="avatar" class="avatar">?</div>
+      <div class="account">
+        <button id="accountBtn" class="avatar" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"></button>
+        <div id="accountMenu" class="account-menu" hidden role="menu"></div>
+      </div>
     </header>
     <div class="wrap">
       <div id="notice" class="notice" role="status" hidden></div>
       <div id="view"><div class="loading">Loading the apprenticeship…</div></div>
     </div>
   </main>
-  <button id="tutorFab" class="tutor-fab" type="button" aria-controls="tutorPanel" aria-expanded="false" hidden>?</button>
+  <button id="tutorFab" class="tutor-fab" type="button" aria-controls="tutorPanel" aria-expanded="false" hidden>
+    <span class="sr-only">Ask the tutor</span>
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12a8 8 0 0 1 8-8h0a8 8 0 0 1 8 8v1.2a3.8 3.8 0 0 1-3.8 3.8H11l-4 3.2v-3.2A8 8 0 0 1 4 13z"/>
+    </svg>
+  </button>
   <section id="tutorPanel" class="tutor-panel glass" hidden>
     <header class="tutor-head">
       <h2 id="tutorTitle">Curriculum tutor</h2>
@@ -55,5 +62,29 @@
       <button class="primary-btn" type="submit">Ask</button>
     </form>
   </section>
+  <div id="celebrateLayer" hidden>
+    <canvas id="fireworks" class="fireworks" aria-hidden="true"></canvas>
+    <div id="celebrateDialog" class="celebrate-dialog glass" role="dialog" aria-modal="true" aria-labelledby="celebrateTitle" tabindex="-1">
+      <h2 id="celebrateTitle"></h2>
+      <p id="celebrateInsight"></p>
+      <div class="phase-actions">
+        <a id="celebrateBack" class="button secondary">Go back</a>
+        <a id="celebrateNext" class="button primary">Proceed</a>
+      </div>
+      <button id="celebrateDismiss" type="button" class="secondary">Keep working</button>
+    </div>
+  </div>
+  <div id="briefLayer" hidden>
+    <div id="briefDialog" class="brief-dialog glass" role="dialog" aria-modal="true" aria-labelledby="briefTitle" tabindex="-1">
+      <div class="eyebrow" id="briefEyebrow"></div>
+      <h2 id="briefTitle"></h2>
+      <p id="briefPrompt"></p>
+      <h3 id="briefHowLabel"></h3>
+      <p id="briefHow"></p>
+      <h3 id="briefExpectedLabel"></h3>
+      <p id="briefExpected"></p>
+      <button id="briefStart" type="button" class="primary-btn">Start the exercise</button>
+    </div>
+  </div>
 </body>
 </html>

@@ -42,6 +42,34 @@ test('register and login create a session cookie', async (t) => {
   assert.equal(duplicate.status, 409);
 });
 
+test('a new account starts at 0% and does not inherit another learner’s progress', async (t) => {
+  const { call, base } = await startApp(t);
+  const first = await (await call('/api/learning')).json();
+  assert.equal(first.overall.progressPercent, 0);
+  assert.deepEqual((await (await call('/api/progress')).json()).completed, []);
+
+  await call('/api/progress', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ phaseId: 'environment', completed: true }),
+  });
+  assert.ok((await (await call('/api/learning')).json()).overall.progressPercent > 0);
+
+  const registered = await fetch(`${base}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Bea', username: 'bea', password: 'password123' }),
+  });
+  assert.equal(registered.status, 201);
+  const cookie = (registered.headers.getSetCookie?.()[0] ?? registered.headers.get('set-cookie') ?? '').split(';')[0];
+  const learning = await fetch(`${base}/api/learning`, { headers: { cookie } });
+  const body = await learning.json();
+  assert.equal(body.overall.progressPercent, 0);
+  assert.equal(body.overall.completed, 0);
+  const progress = await fetch(`${base}/api/progress`, { headers: { cookie } });
+  assert.deepEqual((await progress.json()).completed, []);
+});
+
 test('landing copy is data, not a hardcoded page component', async (t) => {
   const { call } = await startApp(t, { authed: false });
   const shell = await (await call('/api/shell')).json();

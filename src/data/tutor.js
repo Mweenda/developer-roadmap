@@ -7,7 +7,7 @@ export const tutor = {
   closeLabel: 'Collapse tutor',
   offCurriculum: 'I only answer questions about this curriculum: JavaScript, the browser, HTTP, Node, Express, and the rest of the roadmap.',
   noSpoiler: 'I will not give you the answer. Tell me what you expected, what you saw, and which line looks wrong. We will use this chapter’s docs from there.',
-  unavailable: 'The tutor is not configured on this machine. Add GEMINI_API_KEY to .env.',
+  unavailable: 'The tutor is not configured on this machine. Add GOOGLE_GENAI_API_KEY or GEMINI_API_KEY to .env.',
 };
 
 export const TUTOR_RULES = [

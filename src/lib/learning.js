@@ -150,7 +150,16 @@ export function buildLearningSnapshot(progress) {
     }));
 
   const masteredCount = phaseReports.filter((phase) => phase.state === 'MASTERED').length;
-  const progressPercent = Math.round((progress.completed.length / phases.length) * 100);
+  const sectionTotal = phases.reduce((sum, phase) => sum + phase.topics.length + phase.exercises.length + 1, 0);
+  const sectionDone = phaseReports.reduce((sum, phase, index) => {
+    const item = phases[index];
+    if (progress.completed.includes(item.id)) {
+      return sum + item.topics.length + item.exercises.length + 1;
+    }
+    const quizPassed = Boolean(progress.quizzes[item.quiz.id]?.passed || progress.quizzes[item.id]?.passed);
+    return sum + phase.topicsRead + phase.exercisesPassed + (quizPassed ? 1 : 0);
+  }, 0);
+  const progressPercent = sectionTotal ? Math.round((sectionDone / sectionTotal) * 100) : 0;
   const masteryPercent = Math.round(phaseReports.reduce((sum, phase) => sum + phase.mastery, 0) / phaseReports.length);
 
   let action;

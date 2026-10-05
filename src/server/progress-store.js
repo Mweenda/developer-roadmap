@@ -2,8 +2,25 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { nextReviewAt } from '../data/learning-model.js';
 
+const DEFAULT_USER = 'default';
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function emptyState() {
+  return {
+    completed: [],
+    topics: [],
+    exercises: {},
+    quizzes: {},
+    misses: {},
+    reviews: {},
+    projectReviews: {},
+    hints: {},
+    learner: null,
+    updatedAt: null,
+  };
 }
 
 function sanitizeLearner(value) {
@@ -87,18 +104,28 @@ export function createProgressStore(filePath, validPhaseIds, catalog = {}) {
     };
   }
 
-  async function read() {
-    try {
-      return sanitize(JSON.parse(await readFile(filePath, 'utf8')));
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        return { completed: [], topics: [], exercises: {}, quizzes: {}, misses: {}, reviews: {}, projectReviews: {}, hints: {}, learner: null, updatedAt: null };
+  function parseFile(parsed) {
+    if (isPlainObject(parsed?.byUser)) {
+      const byUser = {};
+      for (const [id, value] of Object.entries(parsed.byUser)) {
+        if (!isPlainObject(value)) continue;
+        byUser[id] = sanitize(value);
       }
+      return { byUser };
+    }
+    return { byUser: {} };
+  }
+
+  async function readFileState() {
+    try {
+      return parseFile(JSON.parse(await readFile(filePath, 'utf8')));
+    } catch (error) {
+      if (error.code === 'ENOENT') return { byUser: {} };
       throw error;
     }
   }
 
-  async function write(next) {
+  async function writeFileState(next) {
     await mkdir(dirname(filePath), { recursive: true });
     const tempPath = `${filePath}.tmp`;
     await writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
@@ -112,94 +139,110 @@ export function createProgressStore(filePath, validPhaseIds, catalog = {}) {
     return operation;
   }
 
-  async function get() {
-    await writeQueue;
-    return read();
+  function accountId(userId) {
+    return userId || DEFAULT_USER;
   }
 
-  async function update(phaseId, completed) {
+  async function get(userId = DEFAULT_USER) {
+    await writeQueue;
+    if (userId === null) return emptyState();
+    const file = await readFileState();
+    return file.byUser[accountId(userId)] ?? emptyState();
+  }
+
+  function mutate(userId, updater) {
+    const id = accountId(userId);
+    return enqueue(async () => {
+      const file = await readFileState();
+      const current = file.byUser[id] ?? emptyState();
+      const next = updater(current);
+      file.byUser[id] = { ...next, updatedAt: new Date().toISOString() };
+      await writeFileState(file);
+      return file.byUser[id];
+    });
+  }
+
+  async function update(phaseId, completed, userId = DEFAULT_USER) {
     if (!validIds.has(phaseId)) throw invalid('INVALID_PHASE', `Unknown phase: ${phaseId}`);
     if (typeof completed !== 'boolean') throw invalid('INVALID_COMPLETED', 'completed must be a boolean');
-    return enqueue(async () => {
-      const current = await read();
+    return mutate(userId, (current) => {
       const ids = new Set(current.completed);
       if (completed) ids.add(phaseId);
       else ids.delete(phaseId);
-      return write({ ...current, completed: [...ids], updatedAt: new Date().toISOString() });
+      return { ...current, completed: [...ids] };
     });
   }
 
-  async function completeTopic(topicId, completed) {
+  async function completeTopic(topicId, completed, userId = DEFAULT_USER) {
     if (!validTopicIds.has(topicId)) throw invalid('INVALID_TOPIC', `Unknown topic: ${topicId}`);
     if (typeof completed !== 'boolean') throw invalid('INVALID_COMPLETED', 'completed must be a boolean');
-    return enqueue(async () => {
-      const current = await read();
+    return mutate(userId, (current) => {
       const ids = new Set(current.topics);
       if (completed) ids.add(topicId);
       else ids.delete(topicId);
-      return write({ ...current, topics: [...ids], updatedAt: new Date().toISOString() });
+      return { ...current, topics: [...ids] };
     });
   }
 
-  async function recordExercise(exerciseId, { completed, passed }) {
+  async function recordExercise(exerciseId, { completed, passed }, userId = DEFAULT_USER) {
     if (!validExerciseIds.has(exerciseId)) throw invalid('INVALID_EXERCISE', `Unknown exercise: ${exerciseId}`);
     if (typeof completed !== 'boolean') throw invalid('INVALID_COMPLETED', 'completed must be a boolean');
-    return enqueue(async () => {
-      const current = await read();
+    return mutate(userId, (current) => {
       const existing = current.exercises[exerciseId] ?? { completed: false, passed: false, attempts: 0 };
-      current.exercises[exerciseId] = {
-        completed,
-        passed: Boolean(passed),
-        attempts: existing.attempts + 1,
+      return {
+        ...current,
+        exercises: {
+          ...current.exercises,
+          [exerciseId]: {
+            completed,
+            passed: Boolean(passed),
+            attempts: existing.attempts + 1,
+          },
+        },
       };
-      return write({ ...current, updatedAt: new Date().toISOString() });
     });
   }
 
-  async function recordQuiz(quizId, { score, passed, missed = [] }) {
+  async function recordQuiz(quizId, { score, passed, missed = [] }, userId = DEFAULT_USER) {
     if (!validQuizIds.has(quizId)) throw invalid('INVALID_QUIZ', `Unknown quiz: ${quizId}`);
     if (!Number.isInteger(score)) throw invalid('INVALID_SCORE', 'score must be an integer');
-    return enqueue(async () => {
-      const current = await read();
+    return mutate(userId, (current) => {
       const existing = current.quizzes[quizId] ?? { score: 0, passed: false, attempts: 0, missed: [] };
       const attempts = existing.attempts + 1;
-      current.quizzes[quizId] = {
+      const quiz = {
         score,
         passed: Boolean(passed),
         attempts,
         missed: Array.isArray(missed) ? missed.filter((item) => typeof item === 'string') : [],
       };
-      current.misses[quizId] = current.quizzes[quizId].missed;
-      current.reviews[quizId] = nextReviewAt(Boolean(passed), attempts);
-      return write({ ...current, updatedAt: new Date().toISOString() });
+      return {
+        ...current,
+        quizzes: { ...current.quizzes, [quizId]: quiz },
+        misses: { ...current.misses, [quizId]: quiz.missed },
+        reviews: { ...current.reviews, [quizId]: nextReviewAt(Boolean(passed), attempts) },
+      };
     });
   }
 
-  async function setLearner(name) {
+  async function setLearner(name, userId = DEFAULT_USER) {
     if (typeof name !== 'string') throw invalid('INVALID_LEARNER', 'name must be a string');
     const trimmed = name.trim();
     if (!trimmed) throw invalid('INVALID_LEARNER', 'name is required');
-    return enqueue(async () => {
-      const current = await read();
-      return write({ ...current, learner: { name: trimmed.slice(0, 80) }, updatedAt: new Date().toISOString() });
-    });
+    return mutate(userId, (current) => ({ ...current, learner: { name: trimmed.slice(0, 80) } }));
   }
 
-  async function recordHint(exerciseId, level) {
-    return enqueue(async () => {
-      const current = await read();
+  async function recordHint(exerciseId, level, userId = DEFAULT_USER) {
+    return mutate(userId, (current) => {
       const used = Number(current.hints[exerciseId] ?? 0);
-      current.hints[exerciseId] = Math.max(used, Number(level) || 0);
-      return write({ ...current, updatedAt: new Date().toISOString() });
+      return { ...current, hints: { ...current.hints, [exerciseId]: Math.max(used, Number(level) || 0) } };
     });
   }
 
-  async function recordProjectReview(projectId, review) {
-    return enqueue(async () => {
-      const current = await read();
-      current.projectReviews[projectId] = review;
-      return write({ ...current, updatedAt: new Date().toISOString() });
-    });
+  async function recordProjectReview(projectId, review, userId = DEFAULT_USER) {
+    return mutate(userId, (current) => ({
+      ...current,
+      projectReviews: { ...current.projectReviews, [projectId]: review },
+    }));
   }
 
   return { get, update, completeTopic, recordExercise, recordQuiz, setLearner, recordHint, recordProjectReview };

@@ -74,6 +74,29 @@ export const foundationPhases = [
         explanation: 'Node reads the file and executes it. npm is a package manager; git records history; there is no exec hello.js in this workflow.',
       },
       {
+        id: 'environment__shell',
+        type: 'terminal',
+        title: 'Drive the sandbox terminal',
+        prompt: 'From /home/learner, create javascript-learning, add hello.js and README.md, initialize git, and make the first commit.',
+        guideline: {
+          how: 'Type real commands in the in-app sandbox, one at a time. Use pwd, ls, and git status to see where you are. The sandbox records your input so the server can mark the sequence.',
+          expected: 'mkdir, cd, touch the two files, git init, git add, and git commit — in that order. Inspection commands may appear in between.',
+        },
+        sandbox: {
+          cwd: '/home/learner',
+          user: 'learner',
+          hostname: 'fieldnotes',
+        },
+        expectedCommands: [
+          'mkdir javascript-learning',
+          'cd javascript-learning',
+          'touch hello.js README.md',
+          'git init',
+          'git add README.md hello.js',
+          'git commit -m "Add hello world and project README"',
+        ],
+      },
+      {
         id: 'environment__hello',
         type: 'build',
         title: 'Deliverable: hello world repository',

@@ -13,12 +13,13 @@ import { listLibrary, getLibrarySource } from './data/library.js';
 import { createProgressStore } from './server/progress-store.js';
 import { createJournalStore } from './server/journal-store.js';
 import { createAuthStore, parseCookies, sessionCookie, clearSessionCookie } from './server/auth-store.js';
-import { gradeQuiz, gradeChoiceExercise } from './lib/grade.js';
+import { gradeQuiz, gradeChoiceExercise, gradeTerminalExercise } from './lib/grade.js';
 import { buildLearningSnapshot } from './lib/learning.js';
 import { scoreProject, REVIEW_CRITERIA } from './lib/project-review.js';
 import { buildHealth } from './lib/health.js';
 import { SANDBOX } from './lib/sandbox.js';
 import { askTutor } from './lib/tutor.js';
+import { resolveGeminiApiKey, publicRuntimeConfig } from './lib/firebase-config.js';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +32,7 @@ function clientError(res, error) {
     INVALID_QUIZ: 400,
     INVALID_QUESTION: 400,
     INVALID_ANSWERS: 400,
-    INVALID_SELECTED: 400,
+    INVALID_COMMANDS: 400,
     INVALID_SCORE: 400,
     INVALID_REVIEW: 400,
     INVALID_LEVEL: 400,
@@ -55,19 +56,16 @@ export function createApp({
   progressPath = join(rootDir, '..', 'data', 'progress.json'),
   journalPath = join(rootDir, '..', 'journal'),
   authPath = join(rootDir, '..', 'data', 'users.json'),
-  geminiKey = process.env.GEMINI_API_KEY,
-  geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+  geminiKey = resolveGeminiApiKey(),
+  geminiModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   geminiFetch = fetch,
+  genkitGenerate = null,
 } = {}) {
   const app = express();
   const progress = createProgressStore(progressPath, phases.map((phase) => phase.id), progressCatalog());
   const journal = createJournalStore(journalPath, {
     async getContext() {
-      const state = await progress.get();
-      return {
-        completed: state.completed,
-        currentPhaseId: phases.find((phase) => !state.completed.includes(phase.id))?.id ?? phases[0].id,
-      };
+      return { completed: [], currentPhaseId: phases[0].id };
     },
   });
   const auth = createAuthStore(authPath);
@@ -92,10 +90,14 @@ export function createApp({
     return false;
   }
 
+  function learnerId(req) {
+    return req.user?.id ?? null;
+  }
+
   async function issueSession(res, result) {
     if (!progress.get || !result.user) return result;
-    const state = await progress.get();
-    if (!state.learner) await progress.setLearner(result.user.name);
+    const state = await progress.get(result.user.id);
+    if (!state.learner) await progress.setLearner(result.user.name, result.user.id);
     res.setHeader('Set-Cookie', sessionCookie(result.token));
     return { user: result.user };
   }
@@ -136,17 +138,16 @@ export function createApp({
   });
 
   app.use(async (req, res, next) => {
-    if (!req.path.startsWith('/api') || !isProtected(req)) return next();
+    if (!req.path.startsWith('/api')) return next();
     try {
-      const user = await auth.userFromToken(parseCookies(req.headers.cookie).sid);
-      if (!user) return res.status(401).json({ error: 'Sign in required' });
-      req.user = user;
+      req.user = await auth.userFromToken(parseCookies(req.headers.cookie).sid);
+      if (isProtected(req) && !req.user) return res.status(401).json({ error: 'Sign in required' });
       return next();
     } catch (error) { next(error); }
   });
 
-  async function maybeCompletePhase(phase) {
-    const state = await progress.get();
+  async function maybeCompletePhase(phase, userId) {
+    const state = await progress.get(userId);
     if (state.completed.includes(phase.id)) return state;
     const quizPassed = Boolean(state.quizzes[phase.quiz.id]?.passed);
     const allExercises = phase.exercises.every((exercise) => {
@@ -154,13 +155,13 @@ export function createApp({
       if (!record) return false;
       return exercise.type === 'build' ? record.completed : record.passed;
     });
-    if (quizPassed && allExercises) return progress.update(phase.id, true);
+    if (quizPassed && allExercises) return progress.update(phase.id, true, userId);
     return state;
   }
 
-  app.get('/api/phases', async (_req, res, next) => {
+  app.get('/api/phases', async (req, res, next) => {
     try {
-      const state = await progress.get();
+      const state = await progress.get(learnerId(req));
       res.json({
         phases: phases.map((phase) => ({
           ...summarizePhase(phase),
@@ -183,8 +184,8 @@ export function createApp({
     try {
       const graded = gradeQuiz(phase.quiz, req.body?.answers);
       const missed = graded.results.filter((result) => !result.isCorrect).map((result) => result.id);
-      await progress.recordQuiz(phase.quiz.id, { score: graded.score, passed: graded.passed, missed });
-      return res.json({ ...graded, progress: await maybeCompletePhase(phase) });
+      await progress.recordQuiz(phase.quiz.id, { score: graded.score, passed: graded.passed, missed }, learnerId(req));
+      return res.json({ ...graded, progress: await maybeCompletePhase(phase, learnerId(req)) });
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);
@@ -237,9 +238,13 @@ export function createApp({
     res.json(listShell());
   });
 
+  app.get('/api/config', (_req, res) => {
+    res.json(publicRuntimeConfig({ geminiConfigured: Boolean(geminiKey) }));
+  });
+
   app.get('/api/profile', async (req, res, next) => {
     try {
-      const state = await progress.get();
+      const state = await progress.get(learnerId(req));
       return res.json({ learner: state.learner, user: req.user });
     } catch (error) { next(error); }
   });
@@ -247,7 +252,7 @@ export function createApp({
   app.put('/api/profile', async (req, res, next) => {
     try {
       const user = await auth.renameUser(req.user.id, req.body?.name);
-      const saved = await progress.setLearner(user.name);
+      const saved = await progress.setLearner(user.name, learnerId(req));
       return res.json({ ...saved, user });
     } catch (error) {
       if (clientError(res, error)) return undefined;
@@ -300,12 +305,12 @@ export function createApp({
     }
   });
 
-  app.get('/api/progress', async (_req, res, next) => {
-    try { res.json(await progress.get()); } catch (error) { next(error); }
+  app.get('/api/progress', async (req, res, next) => {
+    try { res.json(await progress.get(learnerId(req))); } catch (error) { next(error); }
   });
 
-  app.get('/api/learning', async (_req, res, next) => {
-    try { res.json(buildLearningSnapshot(await progress.get())); } catch (error) { next(error); }
+  app.get('/api/learning', async (req, res, next) => {
+    try { res.json(buildLearningSnapshot(await progress.get(learnerId(req)))); } catch (error) { next(error); }
   });
 
   app.put('/api/progress', async (req, res, next) => {
@@ -314,7 +319,7 @@ export function createApp({
       return res.status(400).json({ error: 'phaseId and boolean completed are required' });
     }
     try {
-      return res.json(await progress.update(phaseId, completed));
+      return res.json(await progress.update(phaseId, completed, learnerId(req)));
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);
@@ -327,7 +332,7 @@ export function createApp({
       return res.status(400).json({ error: 'topicId and boolean completed are required' });
     }
     try {
-      return res.json(await progress.completeTopic(topicId, completed));
+      return res.json(await progress.completeTopic(topicId, completed, learnerId(req)));
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);
@@ -338,34 +343,43 @@ export function createApp({
     const found = getExerciseById(req.params.id);
     if (!found) return res.status(404).json({ error: 'Exercise not found' });
     const { exercise } = found;
+    const userId = learnerId(req);
     try {
       if (exercise.type === 'choice' || exercise.type === 'predict' || exercise.type === 'debug') {
         const graded = gradeChoiceExercise(exercise, req.body?.selected);
-        await progress.recordExercise(exercise.id, { completed: graded.passed, passed: graded.passed });
-        return res.json({ ...graded, progress: await maybeCompletePhase(found.phase), evaluatedOnServer: false });
+        await progress.recordExercise(exercise.id, { completed: graded.passed, passed: graded.passed }, userId);
+        return res.json({ ...graded, progress: await maybeCompletePhase(found.phase, userId), evaluatedOnServer: false });
       }
       if (exercise.type === 'build') {
         const completed = req.body?.completed === true;
-        await progress.recordExercise(exercise.id, { completed, passed: completed });
+        await progress.recordExercise(exercise.id, { completed, passed: completed }, userId);
         return res.json({
           passed: completed,
           completed,
           solution: completed ? exercise.solution : null,
-          progress: await maybeCompletePhase(found.phase),
+          progress: await maybeCompletePhase(found.phase, userId),
           evaluatedOnServer: false,
+        });
+      }
+      if (exercise.type === 'terminal') {
+        const graded = gradeTerminalExercise(exercise, req.body?.commands);
+        await progress.recordExercise(exercise.id, { completed: graded.passed, passed: graded.passed }, userId);
+        return res.json({
+          ...graded,
+          progress: await maybeCompletePhase(found.phase, userId),
         });
       }
       if (exercise.type === 'code') {
         if (req.body?.reveal === true) {
-          return res.json({ solution: exercise.solution, passed: false, progress: await progress.get(), evaluatedOnServer: false });
+          return res.json({ solution: exercise.solution, passed: false, progress: await progress.get(userId), evaluatedOnServer: false });
         }
         const passed = req.body?.passed === true;
-        await progress.recordExercise(exercise.id, { completed: passed, passed });
+        await progress.recordExercise(exercise.id, { completed: passed, passed }, userId);
         return res.json({
           passed,
           completed: passed,
           solution: passed ? exercise.solution : null,
-          progress: await maybeCompletePhase(found.phase),
+          progress: await maybeCompletePhase(found.phase, userId),
           evaluatedOnServer: false,
         });
       }
@@ -379,7 +393,7 @@ export function createApp({
   app.get('/api/mentor', async (req, res, next) => {
     try {
       const help = mentorHelp(String(req.query.exerciseId ?? ''), req.query.level);
-      await progress.recordHint(String(req.query.exerciseId ?? ''), help.level);
+      await progress.recordHint(String(req.query.exerciseId ?? ''), help.level, learnerId(req));
       return res.json(help);
     } catch (error) {
       if (clientError(res, error)) return undefined;
@@ -393,6 +407,7 @@ export function createApp({
         apiKey: geminiKey,
         model: geminiModel,
         fetchImpl: geminiFetch,
+        generate: genkitGenerate,
       });
       return res.json(reply);
     } catch (error) {
@@ -406,7 +421,7 @@ export function createApp({
     if (!project) return res.status(404).json({ error: 'Project not found' });
     try {
       const scored = scoreProject(req.body?.ratings);
-      const saved = await progress.recordProjectReview(project.id, scored);
+      const saved = await progress.recordProjectReview(project.id, scored, learnerId(req));
       return res.json({ ...scored, projectId: project.id, progress: saved });
     } catch (error) {
       if (clientError(res, error)) return undefined;

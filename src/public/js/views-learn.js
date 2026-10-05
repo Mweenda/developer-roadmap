@@ -2,6 +2,10 @@ import { escapeHtml, renderBlocks, bindCopies } from './html.js';
 import { request } from './api.js';
 import { store, applyProgress, loadLearning, reportFor, phaseProgress, setCompleted, updateChrome } from './store.js';
 import { runCodeExercise } from './runner-client.js';
+import { stageNavigation, celebrationCopy } from './stage.js';
+import { celebratePass, renderStageNav } from './celebrate.js';
+import { maybeShowExerciseBrief, openExerciseBrief } from './exercise-brief.js';
+import { createSandbox, runSandboxCommand } from './term.js';
 
 export function workspaceTabs(phase, active) {
   return `<nav class="tabs">
@@ -13,9 +17,10 @@ export function workspaceTabs(phase, active) {
   </nav>`;
 }
 
-export function workspaceHeader(phase, active) {
+export function workspaceHeader(phase, active, loc = { kind: 'guide' }) {
   const stats = phaseProgress(phase);
   const done = store.progress.completed.includes(phase.id);
+  const nav = stageNavigation(phase, store.progress, loc, store.phases);
   return `<div class="crumb"><a href="#/roadmap">Roadmap</a> / ${escapeHtml(phase.title)}</div>
     <div class="workspace-head">
       <div>
@@ -34,7 +39,8 @@ export function workspaceHeader(phase, active) {
         </div>
       </article>
     </div>
-    ${workspaceTabs(phase, active)}`;
+    ${workspaceTabs(phase, active)}
+    ${renderStageNav(nav)}`;
 }
 
 export async function renderRoadmap() {
@@ -93,7 +99,7 @@ export async function renderPhaseGuide(phase) {
   const report = reportFor(phase.id);
   if (report && !report.unlocked) {
     const required = store.phases.find((item) => item.id === report.requires);
-    store.view.innerHTML = `${workspaceHeader(phase, 'guide')}
+    store.view.innerHTML = `${workspaceHeader(phase, 'guide', { kind: 'guide' })}
       <section class="lesson">
         <aside class="callout">This phase is locked. Fundamentals before frameworks: complete ${escapeHtml(required?.title ?? 'the previous phase')} with exercises and a passing quiz first.</aside>
         <p>${escapeHtml(phase.summary)}</p>
@@ -102,7 +108,7 @@ export async function renderPhaseGuide(phase) {
     updateChrome();
     return;
   }
-  store.view.innerHTML = `${workspaceHeader(phase, 'guide')}
+  store.view.innerHTML = `${workspaceHeader(phase, 'guide', { kind: 'guide' })}
     <section class="lesson">
       <h2>What you should be able to do</h2>
       <ul>${phase.expected.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
@@ -124,24 +130,41 @@ export async function renderPhaseGuide(phase) {
   updateChrome();
 }
 
+export function relatedExercise(phase, topicId) {
+  const index = Math.max(0, phase.topics.findIndex((topic) => topic.id === topicId));
+  return phase.exercises[index] ?? phase.exercises[0];
+}
+
 export function renderTopic(phase, topicId) {
   const topic = phase.topics.find((item) => item.id === topicId) ?? phase.topics[0];
   const read = store.progress.topics.includes(topic.id);
-  store.view.innerHTML = `${workspaceHeader(phase, 'learn')}
+  const exercise = relatedExercise(phase, topic.id);
+  const copy = store.shell.studio ?? {};
+  store.view.innerHTML = `${workspaceHeader(phase, 'learn', { kind: 'topic', topicId: topic.id })}
     <div class="split">
       <nav class="toc">${phase.topics.map((item) => `<a class="${item.id === topic.id ? 'on' : ''} ${store.progress.topics.includes(item.id) ? 'done' : ''}" href="#/phase/${encodeURIComponent(phase.id)}/learn/${encodeURIComponent(item.id)}">${store.progress.topics.includes(item.id) ? '✓ ' : ''}${escapeHtml(item.title)}<small>${item.minutes} min</small></a>`).join('')}</nav>
-      <article class="lesson">
-        <div class="eyebrow">PHASE DOCUMENTATION · ${topic.minutes} MIN</div>
-        <h2>${escapeHtml(topic.title)}</h2>
-        <p class="lede">${escapeHtml(topic.summary)}</p>
-        ${renderBlocks(topic.content)}
-        <div class="phase-actions">
-          <button type="button" class="primary-btn" data-topic="${escapeHtml(topic.id)}">${read ? 'Mark unread' : 'Mark lesson complete'}</button>
-        </div>
-        ${phase.library?.sources?.length ? `<div class="doc-resources tight">${phase.library.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">Look up: ${escapeHtml(source.title)} ↗</a>`).join('')}</div>` : ''}
-      </article>
+      <div class="learn-studio">
+        <article class="lesson studio-brief">
+          <div class="eyebrow">${escapeHtml(copy.briefEyebrow ?? 'Lesson brief')} · ${topic.minutes} MIN</div>
+          <h2>${escapeHtml(topic.title)}</h2>
+          <p class="lede">${escapeHtml(topic.summary)}</p>
+          ${renderBlocks(topic.content)}
+          <div class="phase-actions">
+            <button type="button" class="primary-btn" data-topic="${escapeHtml(topic.id)}">${read ? 'Mark unread' : 'Mark lesson complete'}</button>
+          </div>
+          ${phase.library?.sources?.length ? `<div class="doc-resources tight">${phase.library.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">Look up: ${escapeHtml(source.title)} ↗</a>`).join('')}</div>` : ''}
+        </article>
+        <aside class="studio-terminal" id="exercisePanel">
+          <div class="term-bar"><span>${escapeHtml(copy.promptUser ?? 'learner')}@${escapeHtml(copy.promptHost ?? 'fieldnotes')}</span><span>zsh</span></div>
+          <p class="term-hint">${escapeHtml(copy.afterLesson ?? '')}</p>
+          <p class="term-line"><span class="term-prompt">$</span> check ${escapeHtml(exercise.title)}</p>
+        </aside>
+      </div>
     </div>`;
   bindCopies(store.view);
+  const panel = store.view.querySelector('#exercisePanel');
+  panel.insertAdjacentHTML('beforeend', renderExerciseBody(exercise));
+  bindExercise(phase, exercise, panel, () => renderTopic(phase, topic.id));
   store.view.querySelector('[data-topic]').addEventListener('click', async () => {
     applyProgress(await request('/api/progress/topics', {
       method: 'PUT',
@@ -162,13 +185,14 @@ function exerciseStatus(exercise) {
 
 export function renderExercise(phase, exerciseId) {
   const exercise = phase.exercises.find((item) => item.id === exerciseId) ?? phase.exercises[0];
-  store.view.innerHTML = `${workspaceHeader(phase, 'exercise')}
+  store.view.innerHTML = `${workspaceHeader(phase, 'exercise', { kind: 'exercise', exerciseId: exercise.id })}
     <div class="split">
       <nav class="toc">${phase.exercises.map((item) => `<a class="${item.id === exercise.id ? 'on' : ''}" href="#/phase/${encodeURIComponent(phase.id)}/exercise/${encodeURIComponent(item.id)}">${escapeHtml(item.title)}<small>${item.type} · ${exerciseStatus(item)}</small></a>`).join('')}</nav>
       <article class="lesson" id="exercisePanel"></article>
     </div>`;
   const panel = store.view.querySelector('#exercisePanel');
   panel.innerHTML = `<div class="eyebrow">${escapeHtml(exercise.type)} EXERCISE</div><h2>${escapeHtml(exercise.title)}</h2><p class="lede">${escapeHtml(exercise.prompt)}</p>${exercise.code ? `<section class="snippet"><div class="snippet-head"><span>snippet</span></div><pre><code>${escapeHtml(exercise.code)}</code></pre></section>` : ''}${renderExerciseBody(exercise)}
+    <div class="phase-actions"><button type="button" class="secondary" data-brief>${escapeHtml((store.shell.exerciseUi ?? {}).reopenLabel ?? 'Read the briefing again')}</button></div>
     <aside class="panel" style="margin-top:14px">
       <div class="panel-title"><h3>Mentor</h3><span>HINTS 0–5</span></div>
       <p>Ask only after you have tried. Each level is more help; the last level is the solution.</p>
@@ -177,10 +201,30 @@ export function renderExercise(phase, exerciseId) {
     </aside>`;
   bindExercise(phase, exercise, panel);
   bindMentor(exercise, panel);
+  maybeShowExerciseBrief(exercise);
   updateChrome();
 }
 
 function renderExerciseBody(exercise) {
+  if (exercise.type === 'terminal') {
+    const copy = store.shell.exerciseUi ?? {};
+    const spec = exercise.sandbox ?? {};
+    return `<section class="term-canvas" aria-label="Sandbox terminal">
+      <div class="term-bar"><span>${escapeHtml(spec.user ?? 'learner')}@${escapeHtml(spec.hostname ?? 'fieldnotes')}</span><span>sandbox</span></div>
+      <p class="term-hint">${escapeHtml(copy.termHint ?? '')}</p>
+      <div id="termOutput" class="term-scroll" role="log" aria-live="polite"></div>
+      <form id="termForm" class="term-form">
+        <label class="sr-only" for="termInput">Command</label>
+        <span class="term-prompt">$</span>
+        <input id="termInput" name="command" autocomplete="off" spellcheck="false">
+        <button class="primary-btn" type="submit">Run</button>
+      </form>
+      <div class="phase-actions">
+        <button type="button" class="primary-btn" data-term-submit>${escapeHtml(copy.termSubmitLabel ?? 'Submit commands for marking')}</button>
+      </div>
+      <div id="exerciseResult"></div>
+    </section>`;
+  }
   if (exercise.type === 'code') {
     return `<label class="editor-label" for="code">Your function</label>
       <textarea id="code" class="editor" spellcheck="false">${escapeHtml(exercise.starter)}</textarea>
@@ -198,8 +242,22 @@ function renderExerciseBody(exercise) {
   return `<form id="choiceForm" class="choices">${exercise.choices.map((choice, index) => `<label class="choice"><input type="radio" name="choice" value="${index}"><span>${escapeHtml(choice)}</span></label>`).join('')}<button class="primary-btn" type="submit">Check answer</button></form><div id="exerciseResult"></div>`;
 }
 
-function bindExercise(phase, exercise, panel) {
+function showPass(phase, loc, details) {
+  const nav = stageNavigation(phase, store.progress, loc, store.phases);
+  const copy = celebrationCopy(details, store.shell.celebrate);
+  celebratePass({
+    title: copy.title,
+    insight: copy.insight,
+    backHref: nav.back.href,
+    nextHref: nav.next.href,
+    nextEnabled: nav.next.enabled,
+  });
+}
+
+function bindExercise(phase, exercise, panel, onDone) {
+  const rerender = onDone ?? (() => renderExercise(phase, exercise.id));
   const result = panel.querySelector('#exerciseResult');
+  panel.querySelector('[data-brief]')?.addEventListener('click', () => openExerciseBrief(exercise));
   const form = panel.querySelector('#choiceForm');
   if (form) {
     form.addEventListener('submit', async (event) => {
@@ -217,8 +275,18 @@ function bindExercise(phase, exercise, panel) {
         });
         applyProgress(graded.progress);
         result.innerHTML = `<div class="${graded.passed ? 'pass' : 'fail'} box">${graded.passed ? 'Correct.' : 'Not yet.'} ${escapeHtml(graded.explanation)}</div>`;
-        renderExercise(phase, exercise.id);
-        store.view.querySelector('#exerciseResult').innerHTML = result.innerHTML;
+        rerender();
+        const saved = store.view.querySelector('#exerciseResult');
+        if (saved) saved.innerHTML = result.innerHTML;
+        if (graded.passed) {
+          showPass(phase, { kind: 'exercise', exerciseId: exercise.id }, {
+            kind: 'question',
+            phase,
+            exercise,
+            explanation: graded.explanation,
+            phaseComplete: store.progress.completed.includes(phase.id),
+          });
+        }
       } catch (error) {
         result.innerHTML = `<p class="fail">${escapeHtml(error.message)}</p>`;
       }
@@ -237,6 +305,13 @@ function bindExercise(phase, exercise, panel) {
       });
       applyProgress(graded.progress);
       result.innerHTML += `<div class="pass box">All tests passed. Progress saved.${graded.solution ? `<pre><code>${escapeHtml(graded.solution)}</code></pre>` : ''}</div>`;
+      showPass(phase, { kind: 'exercise', exerciseId: exercise.id }, {
+        kind: 'exercise',
+        phase,
+        exercise,
+        explanation: 'Every test you wrote against passed. That is evidence, not a guessed click.',
+        phaseComplete: store.progress.completed.includes(phase.id),
+      });
     }
   });
   panel.querySelector('[data-reveal]')?.addEventListener('click', async () => {
@@ -255,6 +330,61 @@ function bindExercise(phase, exercise, panel) {
     });
     applyProgress(graded.progress);
     result.innerHTML = `<div class="pass box">Deliverable marked complete. ${escapeHtml(graded.solution ?? '')}</div>`;
+    showPass(phase, { kind: 'exercise', exerciseId: exercise.id }, {
+      kind: 'exercise',
+      phase,
+      exercise,
+      explanation: graded.solution,
+      phaseComplete: store.progress.completed.includes(phase.id),
+    });
+  });
+  bindTerminal(phase, exercise, panel, result);
+}
+
+function bindTerminal(phase, exercise, panel, result) {
+  const form = panel.querySelector('#termForm');
+  const output = panel.querySelector('#termOutput');
+  const submit = panel.querySelector('[data-term-submit]');
+  if (!form || !output) return;
+  const sandbox = createSandbox(exercise.sandbox ?? {});
+  const paint = () => {
+    output.innerHTML = sandbox.history.map((item) => {
+      const prompt = `${escapeHtml(sandbox.user)}@${escapeHtml(sandbox.hostname)}:${escapeHtml(sandbox.cwd)}$`;
+      return `<p class="term-line"><span class="term-prompt">${prompt}</span> ${escapeHtml(item.input)}</p>${item.output ? `<pre class="term-out">${escapeHtml(item.output)}</pre>` : ''}`;
+    }).join('');
+    output.scrollTop = output.scrollHeight;
+  };
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = panel.querySelector('#termInput');
+    const line = input.value;
+    input.value = '';
+    const ran = runSandboxCommand(sandbox, line);
+    if (ran.clear) sandbox.history = sandbox.history.filter((item) => item.input !== 'clear');
+    paint();
+    input.focus();
+  });
+  submit?.addEventListener('click', async () => {
+    try {
+      const graded = await request(`/api/exercises/${encodeURIComponent(exercise.id)}/submit`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ commands: sandbox.history.map((item) => item.input) }),
+      });
+      applyProgress(graded.progress);
+      result.innerHTML = `<div class="${graded.passed ? 'pass' : 'fail'} box">${escapeHtml(graded.explanation)}</div>`;
+      if (graded.passed) {
+        showPass(phase, { kind: 'exercise', exerciseId: exercise.id }, {
+          kind: 'exercise',
+          phase,
+          exercise,
+          explanation: graded.explanation,
+          phaseComplete: store.progress.completed.includes(phase.id),
+        });
+      }
+    } catch (error) {
+      result.innerHTML = `<p class="fail">${escapeHtml(error.message)}</p>`;
+    }
   });
 }
 
@@ -280,7 +410,7 @@ function bindMentor(exercise, panel) {
 
 export function renderQuiz(phase) {
   const previous = store.progress.quizzes[phase.id];
-  store.view.innerHTML = `${workspaceHeader(phase, 'quiz')}
+  store.view.innerHTML = `${workspaceHeader(phase, 'quiz', { kind: 'quiz' })}
     <article class="lesson">
       <div class="eyebrow">PASSING SCORE ${phase.quiz.passingScore}%</div>
       <h2>Phase quiz</h2>
@@ -311,6 +441,15 @@ export function renderQuiz(phase) {
           return `<li class="${item.isCorrect ? 'pass' : 'fail'}"><p>${escapeHtml(question.prompt)}</p><p>${item.isCorrect ? 'Correct' : `Your answer: ${question.choices[item.selected] ?? 'blank'}. Correct: ${question.choices[item.correct]}`}</p><p>${escapeHtml(item.explanation)}</p></li>`;
         }).join('')}</ol>`;
       result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (graded.passed) {
+        const firstHit = graded.results.find((item) => item.isCorrect);
+        showPass(phase, { kind: 'quiz' }, {
+          kind: 'quiz',
+          phase,
+          explanation: firstHit?.explanation ?? `You scored ${graded.score}%. Write the phase gate in your own words before you skip ahead.`,
+          phaseComplete: store.progress.completed.includes(phase.id),
+        });
+      }
     } catch (error) {
       store.notice.textContent = error.message;
       store.notice.hidden = !error.message;
