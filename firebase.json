@@ -18,6 +18,7 @@
     }
   ],
   "hosting": {
+    "site": "fieldnotes-apprenticeship",
     "public": "src/public",
     "ignore": [
       "firebase.json",

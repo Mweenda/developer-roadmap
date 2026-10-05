@@ -14,6 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 test('Firebase Hosting serves the UI and rewrites /api to the Express function', async () => {
   const json = JSON.parse(await readFile(join(root, 'firebase.json'), 'utf8'));
   const hosting = json.hosting;
+  assert.equal(hosting.site, 'fieldnotes-apprenticeship');
   assert.equal(hosting.public, 'src/public');
   const apiRewrite = hosting.rewrites.find((rule) => rule.source === '/api/**');
   assert.ok(apiRewrite, 'Hosting must rewrite /api; do not ship a static-only site');
