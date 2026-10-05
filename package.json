@@ -10,7 +10,11 @@
     "build": "pnpm build:css && node scripts/sync-cdn-public.js",
     "build:css": "tailwindcss -i src/styles/input.css -o src/public/styles.css --minify",
     "test": "node --test test/*.test.js",
-    "test:watch": "node --test --watch test/*.test.js"
+    "test:watch": "node --test --watch test/*.test.js",
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "BASE_URL=https://developer-roadmap-ruby.vercel.app playwright test",
+    "dev:vite": "vite",
+    "build:vite": "vite build"
   },
   "engines": {
     "node": ">=20"
@@ -25,7 +29,9 @@
     "genkit": "^1.42.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/cli": "^4.3.3",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.2"
   }
 }

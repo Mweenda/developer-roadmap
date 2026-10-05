@@ -18,6 +18,13 @@ test('Vercel deploys the Express app; Firebase Hosting stays as a fallback', asy
 
   const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   assert.match(pkg.scripts.build, /sync-cdn-public/);
+  assert.equal(pkg.devDependencies.vite.startsWith('^') || Boolean(pkg.devDependencies.vite), true);
+  assert.ok(pkg.devDependencies.vite, 'vite is the frontend toolchain; Express remains the /api server');
+  assert.ok(pkg.devDependencies['@playwright/test']);
+
+  const vite = await readFile(join(root, 'vite.config.js'), 'utf8');
+  assert.match(vite, /proxy/);
+  assert.match(vite, /\/api/);
 
   const entry = await readFile(join(root, 'server.js'), 'utf8');
   assert.match(entry, /from 'express'/);

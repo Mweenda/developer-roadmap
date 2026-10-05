@@ -104,8 +104,9 @@ That is the test gate. GitHub Actions runs the same command on every push and pu
 | `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
 | `test/firebase-hosting.test.js` | Hosting rewrites `/api`; App Hosting uses Firestore; `__session` cookie |
 | `test/vercel.test.js` | Vercel Express entry; CDN `public/` copy; Firebase config kept as fallback |
+| `e2e/portal.spec.js` | Playwright: landing, `/api`, `__session`, register, Phase 0, journal, sign-out |
 
-Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
+Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`. Browser smoke: `pnpm test:e2e` (local) or `pnpm test:e2e:prod` (Vercel). `pnpm dev:vite` is the frontend HMR server and proxies `/api` to Express — it does not replace `pnpm dev`.
 
 ## Deployment architecture
 
