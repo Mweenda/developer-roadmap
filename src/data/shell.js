@@ -1,3 +1,5 @@
+import { tutor } from './tutor.js';
+
 export const habits = [
   { title: 'Foundations before frameworks', body: 'JavaScript → browser → HTTP → Node → database → React. Do not use a framework to skip a fundamental.' },
   { title: 'Every phase has a project', body: 'You do not “finish JavaScript.” You demonstrate it by building something and explaining it.' },
@@ -35,5 +37,5 @@ export const landing = {
 };
 
 export function listShell() {
-  return { habits, projectMilestones, landing };
+  return { habits, projectMilestones, landing, tutor };
 }

@@ -32,13 +32,14 @@ export function cookieFrom(response) {
   return match ? match[0] : '';
 }
 
-export async function startApp(t, { authed = true } = {}) {
+export async function startApp(t, { authed = true, ...appOptions } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'roadmap-api-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const app = createApp({
     progressPath: join(dir, 'progress.json'),
     journalPath: join(dir, 'journal'),
     authPath: join(dir, 'users.json'),
+    ...appOptions,
   });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));

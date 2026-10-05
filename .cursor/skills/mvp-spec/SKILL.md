@@ -20,6 +20,7 @@ If a feature from `./docs/MVP_Spec.pdf` is missing, **stop and implement that fe
 ## Non-negotiables
 
 - Follow the milestone todo list in `skills.md` **one by one**.
+- Work on `dev`. Merge `dev` into `main` only; never land features on `main` directly.
 - Curriculum and landing copy live in `src/data/`, never hardcoded into UI components.
 - Opening a lesson is `LEARNING`, never `MASTERED`.
 - Keep `PHASE_SEQUENCE` locks (fundamentals before frameworks).

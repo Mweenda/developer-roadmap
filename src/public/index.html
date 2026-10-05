@@ -41,5 +41,19 @@
       <div id="view"><div class="loading">Loading the apprenticeship…</div></div>
     </div>
   </main>
+  <button id="tutorFab" class="tutor-fab" type="button" aria-controls="tutorPanel" aria-expanded="false" hidden>?</button>
+  <section id="tutorPanel" class="tutor-panel glass" hidden>
+    <header class="tutor-head">
+      <h2 id="tutorTitle">Curriculum tutor</h2>
+      <button id="tutorClose" type="button" aria-label="Collapse tutor">×</button>
+    </header>
+    <p id="tutorGreeting" class="tutor-greeting"></p>
+    <div id="tutorLog" class="tutor-log" role="log" aria-live="polite"></div>
+    <form id="tutorForm">
+      <label class="sr-only" for="tutorInput">Question</label>
+      <textarea id="tutorInput" rows="3" maxlength="2000" required></textarea>
+      <button class="primary-btn" type="submit">Ask</button>
+    </form>
+  </section>
 </body>
 </html>

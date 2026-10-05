@@ -10,7 +10,7 @@ import {
   renderHabits, renderGit, renderDebugLab, renderProfile, renderLanding, renderRegister, renderLogin,
 } from './js/views-pages.js';
 import { renderJournal, renderJournalPhase, renderJournalEditor } from './js/views-journal.js';
-import { renderRoadmap, renderPhaseGuide, renderTopic, renderExercise, renderQuiz } from './js/views-learn.js';
+import { bindTutor, setTutorVisible } from './js/chatbot.js';
 
 async function render() {
   showNotice('');
@@ -18,11 +18,13 @@ async function render() {
   try {
     if (!store.session) {
       document.body.classList.add('public');
+      setTutorVisible(false);
       if (route.name === 'login') return renderLogin();
       if (route.name === 'register') return renderRegister();
       return renderLanding();
     }
     document.body.classList.remove('public');
+    setTutorVisible(true);
     if (route.name === 'login' || route.name === 'register') {
       location.hash = '#/';
       return renderOverview();
@@ -65,6 +67,7 @@ async function init() {
   try {
     store.shell = await request('/api/shell');
     store.session = (await request('/api/auth/me')).user;
+    bindTutor();
     if (store.session) await loadWorkspace();
     await render();
   } catch (error) {

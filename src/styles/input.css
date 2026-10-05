@@ -725,3 +725,71 @@ body.public .wrap { padding-top: 6vh; }
   .mobile-nav { display: flex; }
   .stat-row { grid-template-columns: repeat(2, 1fr); }
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+.tutor-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 40;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(145deg, hsl(var(--primary)), #38bdf8);
+  color: hsl(var(--primary-foreground));
+  font: 700 22px var(--font-display);
+  cursor: pointer;
+  box-shadow: var(--shadow-border), 0 12px 28px rgba(45, 212, 191, 0.28);
+}
+.tutor-panel {
+  position: fixed;
+  right: 22px;
+  bottom: 90px;
+  z-index: 41;
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(520px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 18px;
+}
+.tutor-panel[hidden], .tutor-fab[hidden] { display: none; }
+.tutor-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.tutor-head h2 { font: 700 14px var(--font-display); margin: 0; }
+.tutor-head button {
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.tutor-greeting { font-size: 12px; color: hsl(var(--muted)); line-height: 1.5; margin: 8px 0; }
+.tutor-log { flex: 1; overflow: auto; display: grid; gap: 8px; min-height: 140px; margin-bottom: 10px; }
+.tutor-msg { margin: 0; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+.tutor-msg.learner { background: rgba(45, 212, 191, 0.14); justify-self: end; }
+.tutor-msg.tutor { background: rgba(167, 139, 250, 0.16); }
+#tutorForm { display: grid; gap: 8px; }
+#tutorInput {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font: 12px var(--font-sans);
+  color: inherit;
+  background: rgba(8, 12, 28, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 8px;
+}
+body.public .tutor-fab, body.public .tutor-panel { display: none; }

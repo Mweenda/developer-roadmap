@@ -3,3 +3,5 @@ data/progress.json
 data/users.json
 journal/
 *.tmp
+.env
+.env.local

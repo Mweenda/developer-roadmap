@@ -18,6 +18,7 @@ import { buildLearningSnapshot } from './lib/learning.js';
 import { scoreProject, REVIEW_CRITERIA } from './lib/project-review.js';
 import { buildHealth } from './lib/health.js';
 import { SANDBOX } from './lib/sandbox.js';
+import { askTutor } from './lib/tutor.js';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,7 @@ function clientError(res, error) {
     INVALID_TOPIC: 400,
     INVALID_EXERCISE: 400,
     INVALID_QUIZ: 400,
+    INVALID_QUESTION: 400,
     INVALID_ANSWERS: 400,
     INVALID_SELECTED: 400,
     INVALID_SCORE: 400,
@@ -40,6 +42,7 @@ function clientError(res, error) {
     INVALID_PATH: 400,
     INVALID_CONTENT: 400,
     INVALID_TYPE: 400,
+    TUTOR_UNAVAILABLE: 503,
     NOT_FOUND: 404,
   };
   const status = statusByCode[error.code];
@@ -52,6 +55,9 @@ export function createApp({
   progressPath = join(rootDir, '..', 'data', 'progress.json'),
   journalPath = join(rootDir, '..', 'journal'),
   authPath = join(rootDir, '..', 'data', 'users.json'),
+  geminiKey = process.env.GEMINI_API_KEY,
+  geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+  geminiFetch = fetch,
 } = {}) {
   const app = express();
   const progress = createProgressStore(progressPath, phases.map((phase) => phase.id), progressCatalog());
@@ -75,7 +81,7 @@ export function createApp({
 
   function isProtected(req) {
     const { method, path } = req;
-    if (path === '/api/mentor') return true;
+    if (path === '/api/mentor' || path === '/api/tutor') return true;
     if (method === 'POST' && /^\/api\/debug-lab\//.test(path)) return true;
     if (method === 'POST' && /^\/api\/projects\/[^/]+\/review$/.test(path)) return true;
     if (path.startsWith('/api/journal')) return true;
@@ -375,6 +381,20 @@ export function createApp({
       const help = mentorHelp(String(req.query.exerciseId ?? ''), req.query.level);
       await progress.recordHint(String(req.query.exerciseId ?? ''), help.level);
       return res.json(help);
+    } catch (error) {
+      if (clientError(res, error)) return undefined;
+      return next(error);
+    }
+  });
+
+  app.post('/api/tutor', async (req, res, next) => {
+    try {
+      const reply = await askTutor(req.body ?? {}, {
+        apiKey: geminiKey,
+        model: geminiModel,
+        fetchImpl: geminiFetch,
+      });
+      return res.json(reply);
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);

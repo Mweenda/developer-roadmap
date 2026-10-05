@@ -2,6 +2,10 @@
 
 Source of truth: [`docs/MVP_Spec.pdf`](docs/MVP_Spec.pdf). Companion: [`docs/PRODUCT.md`](docs/PRODUCT.md). Cursor skill: [`.cursor/skills/mvp-spec/SKILL.md`](.cursor/skills/mvp-spec/SKILL.md).
 
+## Git branches
+
+Work on **`dev`**. **`main` is only updated by merging `dev`.** Never commit feature work directly to `main`. Never merge `main` into `dev` as a substitute for finishing work on `dev`. Pull requests and deploys flow `dev` → `main`.
+
 ## Hard rule
 
 **If a feature from `./docs/MVP_Spec.pdf` is missing, the development team must STOP and implement that feature, ensure all tests pass (`pnpm test`), then proceed to audit.**
@@ -64,7 +68,7 @@ Work top to bottom. Check a milestone off only after its review gate is true **a
 - [x] **M13** Project review system — 9 dimensions + next improvement
 - [x] **M14** Git / engineering workflow teaching
 - [x] **M15** Debugging lab
-- [x] **M16** Mentor hint ladder (levels 0–5), assistance tracked
+- [x] **M16** Mentor hint ladder (levels 0–5) plus Gemini curriculum tutor (guide, never give the answer)
 - [x] **M17** Knowledge graph — concept edges on the map
 - [x] **M18** Personal learning dashboard
 - [x] **M19** Full concept-level curriculum depth (17 phases, ≥2 content blocks/topic)
@@ -93,7 +97,7 @@ That is the only merge gate. GitHub Actions runs the same command on every push 
 | `test/mvp.test.js` | JS fundamentals headings, “Start Phase 0.” |
 | `test/progress.test.js` | Progress store persistence and validation |
 | `test/roadmap.test.js` | 17 phases and javascript-core content |
-| `test/size.test.js` | Public JS/CSS stay under the chunk size that warns on build |
+| `test/tutor.test.js` | Gemini tutor: chapter docs, no spoilers, auth, chatbot widget, `.env` ignored |
 
 Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
 
@@ -101,4 +105,4 @@ Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm buil
 
 - No empty folders. No unused imports.
 - Never execute arbitrary learner code on the application server.
-- Passwords are hashed (scrypt). Do not commit `data/users.json` or plaintext secrets.
+- Passwords are hashed (scrypt). Do not commit `data/users.json`, `.env`, or plaintext secrets.
