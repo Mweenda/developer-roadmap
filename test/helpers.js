@@ -28,7 +28,7 @@ export async function fileSize(path) {
 
 export function cookieFrom(response) {
   const header = response.headers.getSetCookie?.()[0] ?? response.headers.get('set-cookie') ?? '';
-  const match = header.match(/^sid=[^;]+/);
+  const match = header.match(/^__session=[^;]+/);
   return match ? match[0] : '';
 }
 

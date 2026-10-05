@@ -22,7 +22,7 @@ function toPosix(value) {
   return value.split(sep).join('/');
 }
 
-export function createJournalStore(rootDir, { getContext = async () => ({ currentPhaseId: 'environment', completed: [] }) } = {}) {
+export function createJournalStore(rootDir, { getContext = async () => ({ currentPhaseId: 'environment', completed: [] }), fileMap } = {}) {
   let writeQueue = Promise.resolve();
 
   function resolveSafe(relativePath) {
@@ -47,6 +47,20 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
   }
 
   async function ensureRoot() {
+    if (fileMap) {
+      if (!(await fileMap.exists('README.md'))) {
+        const context = await getContext();
+        await fileMap.write('README.md', `${renderIndex({
+          currentPhase: getJournalPhase(context.currentPhaseId),
+          completed: context.completed,
+          opened: [],
+          percent: 0,
+        })}\n`);
+        await fileMap.write('DECISIONS.md', rootDecisionsTemplate());
+        await fileMap.write('debugging.md', rootDebuggingTemplate());
+      }
+      return;
+    }
     await mkdir(rootDir, { recursive: true });
     const indexPath = join(rootDir, 'README.md');
     try {
@@ -66,6 +80,7 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
   }
 
   async function listMarkdown(dir = rootDir, prefix = '') {
+    if (fileMap) return fileMap.list();
     let entries = [];
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -98,6 +113,10 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
       ?? journalPhases[0];
     const percent = Math.round((context.completed.length / journalPhases.length) * 100);
     const content = `${renderIndex({ currentPhase: current, completed: context.completed, opened, percent })}\n`;
+    if (fileMap) {
+      await fileMap.write('README.md', content);
+      return;
+    }
     const temp = join(rootDir, 'README.md.tmp');
     await writeFile(temp, content, 'utf8');
     await rename(temp, join(rootDir, 'README.md'));
@@ -107,6 +126,11 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
     if (typeof content !== 'string') throw invalid('INVALID_CONTENT', 'content must be a string');
     if (Buffer.byteLength(content, 'utf8') > MAX_BYTES) throw invalid('INVALID_CONTENT', 'File is too large');
     const { full, relative: posix } = resolveSafe(relativePath);
+    if (fileMap) {
+      if (scaffold && await fileMap.exists(posix)) return posix;
+      await fileMap.write(posix, content);
+      return posix;
+    }
     await mkdir(dirname(full), { recursive: true });
     if (scaffold) {
       try {
@@ -158,6 +182,14 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
 
   async function readNow(relativePath) {
     const { full, relative: posix } = resolveSafe(relativePath);
+    if (fileMap) {
+      try {
+        return await fileMap.read(posix);
+      } catch (error) {
+        if (error.code === 'ENOENT') throw invalid('NOT_FOUND', `Unknown journal file: ${posix}`);
+        throw error;
+      }
+    }
     try {
       return { path: posix, content: await readFile(full, 'utf8') };
     } catch (error) {
@@ -183,7 +215,7 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
       for (const file of phase.files) {
         const relativePath = `${phase.folder}/${file.name}`;
         if (file.type === 'folder') {
-          await mkdir(join(rootDir, phase.folder, dirname(file.name)), { recursive: true });
+          if (!fileMap) await mkdir(join(rootDir, phase.folder, dirname(file.name)), { recursive: true });
           if (file.name.endsWith('.gitkeep')) {
             await writeFileSafe(relativePath, '', { scaffold: true });
           }
@@ -210,7 +242,9 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
       let relativePath;
       const phase = phaseId ? getJournalPhase(phaseId) : null;
       if (type === 'decision') {
-        const existing = await readFile(join(rootDir, 'DECISIONS.md'), 'utf8');
+        const existing = fileMap
+          ? (await fileMap.read('DECISIONS.md')).content
+          : await readFile(join(rootDir, 'DECISIONS.md'), 'utf8');
         const addition = `\n## ADR — ${title || 'Untitled'}\n\n### Decision\n\n### Reason\n\n### Alternatives considered\n\n- \n\n### Decision date\n\n${today()}\n`;
         await writeFileSafe('DECISIONS.md', `${existing.trim()}\n${addition}`);
         await rebuildIndex();
@@ -222,7 +256,7 @@ export function createJournalStore(rootDir, { getContext = async () => ({ curren
         for (const file of phase.files) {
           const path = `${phase.folder}/${file.name}`;
           if (file.type === 'folder') {
-            await mkdir(join(rootDir, phase.folder, dirname(file.name)), { recursive: true });
+            if (!fileMap) await mkdir(join(rootDir, phase.folder, dirname(file.name)), { recursive: true });
             if (file.name.endsWith('.gitkeep')) await writeFileSafe(path, '', { scaffold: true });
             continue;
           }

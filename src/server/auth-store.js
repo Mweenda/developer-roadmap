@@ -1,7 +1,6 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { createFileJsonIo } from './json-io.js';
 
 const scryptAsync = promisify(scrypt);
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -50,20 +49,36 @@ export function parseCookies(header) {
   return cookies;
 }
 
-export function sessionCookie(token) {
-  return `sid=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(SESSION_MS / 1000)}`;
+export function sessionCookie(token, { secure = false } = {}) {
+  const parts = [
+    `__session=${encodeURIComponent(token)}`,
+    'HttpOnly',
+    'Path=/',
+    'SameSite=Lax',
+    `Max-Age=${Math.floor(SESSION_MS / 1000)}`,
+  ];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
 }
 
-export function clearSessionCookie() {
-  return 'sid=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0';
+export function clearSessionCookie({ secure = false } = {}) {
+  const parts = ['__session=', 'HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=0'];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+export function sessionTokenFrom(header) {
+  const cookies = parseCookies(header);
+  return cookies.__session || cookies.sid || '';
 }
 
 export function publicUser(user) {
   return { id: user.id, username: user.username, name: user.name };
 }
 
-export function createAuthStore(filePath) {
+export function createAuthStore(filePath, { jsonIo } = {}) {
   let writeQueue = Promise.resolve();
+  const io = jsonIo ?? createFileJsonIo(filePath);
 
   function sanitize(parsed) {
     const users = Array.isArray(parsed.users)
@@ -76,20 +91,13 @@ export function createAuthStore(filePath) {
   }
 
   async function read() {
-    try {
-      return sanitize(JSON.parse(await readFile(filePath, 'utf8')));
-    } catch (error) {
-      if (error.code === 'ENOENT') return { users: [], sessions: [] };
-      throw error;
-    }
+    const parsed = await io.read();
+    if (!parsed) return { users: [], sessions: [] };
+    return sanitize(parsed);
   }
 
   async function write(next) {
-    await mkdir(dirname(filePath), { recursive: true });
-    const tempPath = `${filePath}.tmp`;
-    await writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-    await rename(tempPath, filePath);
-    return next;
+    return io.write(next);
   }
 
   function enqueue(work) {

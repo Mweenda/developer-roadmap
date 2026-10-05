@@ -102,6 +102,7 @@ That is the test gate. GitHub Actions runs the same command on every push and pu
 | `test/tutor.test.js` | Gemini tutor: chapter docs, no spoilers, auth, chatbot widget, `.env` ignored |
 | `test/account.test.js` | Profile is in the avatar menu, not the sidebar; Settings and Sign out live there too |
 | `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
+| `test/firebase-hosting.test.js` | Hosting serves the UI; `/api` rewrites to Express; `__session` cookie |
 
 Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
 
@@ -114,13 +115,13 @@ Whenever a feature is implemented successfully, ship it. Do not leave finished w
 3. If the build or `test/size.test.js` reports a public JS file over **32KB** or `src/public/styles.css` over **48KB**, **stop**. Split `src/public` into smaller ES modules until every chunk is under the limit and the suite is green. Do not raise the size cap to make the error go away.
 4. Commit on **`dev`** (never `.env`, `data/users.json`, or API keys).
 5. Push to GitHub: `git push -u origin HEAD`.
-6. Deploy to the Firebase Hosting **live** channel for `fieldnotes-apprenticeship`:
+6. Deploy the Hosting **live** channel and the Express API Cloud Function for `fieldnotes-apprenticeship`:
 
 ```sh
-firebase hosting:channel:deploy live --project fieldnotes-apprenticeship
+firebase deploy --only hosting,functions --project fieldnotes-apprenticeship
 ```
 
-Do not deploy a static-only `public/` folder that drops the Express `/api`. The live site must still run the apprenticeship server. Skip push and deploy if tests or chunk limits fail.
+Cloud Functions (the Express `/api` server) require the Firebase **Blaze** plan. Enable billing for `fieldnotes-apprenticeship` before this deploy, then Hosting serves `src/public` and `/api/**` is rewritten to the `api` function on the same origin.
 
 ## Housekeeping
 

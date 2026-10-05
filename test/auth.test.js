@@ -21,7 +21,7 @@ test('register and login create a session cookie', async (t) => {
   assert.equal(created.user.hash, undefined);
 
   const cookie = registered.headers.getSetCookie?.()[0] ?? registered.headers.get('set-cookie');
-  assert.match(String(cookie), /sid=/);
+  assert.match(String(cookie), /__session=/);
   assert.match(String(cookie), /HttpOnly/i);
 
   const me = await fetch(`${base}/api/auth/me`, { headers: { cookie: cookie.split(';')[0] } });

@@ -12,7 +12,7 @@ import { projects } from './data/projects.js';
 import { listLibrary, getLibrarySource } from './data/library.js';
 import { createProgressStore } from './server/progress-store.js';
 import { createJournalStore } from './server/journal-store.js';
-import { createAuthStore, parseCookies, sessionCookie, clearSessionCookie } from './server/auth-store.js';
+import { createAuthStore, sessionCookie, clearSessionCookie, sessionTokenFrom } from './server/auth-store.js';
 import { gradeQuiz, gradeChoiceExercise, gradeTerminalExercise } from './lib/grade.js';
 import { buildLearningSnapshot } from './lib/learning.js';
 import { scoreProject, REVIEW_CRITERIA } from './lib/project-review.js';
@@ -56,21 +56,26 @@ export function createApp({
   progressPath = join(rootDir, '..', 'data', 'progress.json'),
   journalPath = join(rootDir, '..', 'journal'),
   authPath = join(rootDir, '..', 'data', 'users.json'),
+  progressIo = null,
+  authIo = null,
+  journalFileMap = null,
   geminiKey = resolveGeminiApiKey(),
   geminiModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   geminiFetch = fetch,
   genkitGenerate = null,
 } = {}) {
   const app = express();
-  const progress = createProgressStore(progressPath, phases.map((phase) => phase.id), progressCatalog());
+  const progress = createProgressStore(progressPath, phases.map((phase) => phase.id), progressCatalog(), progressIo ? { jsonIo: progressIo } : {});
   const journal = createJournalStore(journalPath, {
     async getContext() {
       return { completed: [], currentPhaseId: phases[0].id };
     },
+    fileMap: journalFileMap ?? undefined,
   });
-  const auth = createAuthStore(authPath);
+  const auth = createAuthStore(authPath, authIo ? { jsonIo: authIo } : {});
   const startedAt = Date.now();
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '256kb' }));
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) res.setHeader('X-Request-Logged', '1');
@@ -94,18 +99,24 @@ export function createApp({
     return req.user?.id ?? null;
   }
 
-  async function issueSession(res, result) {
+  function cookieOpts(req) {
+    const proto = req.headers['x-forwarded-proto'];
+    const secure = Boolean(req.secure || proto === 'https' || process.env.FUNCTION_TARGET || process.env.K_SERVICE);
+    return { secure };
+  }
+
+  async function issueSession(req, res, result) {
     if (!progress.get || !result.user) return result;
     const state = await progress.get(result.user.id);
     if (!state.learner) await progress.setLearner(result.user.name, result.user.id);
-    res.setHeader('Set-Cookie', sessionCookie(result.token));
+    res.setHeader('Set-Cookie', sessionCookie(result.token, cookieOpts(req)));
     return { user: result.user };
   }
 
   app.post('/api/auth/register', async (req, res, next) => {
     try {
       const result = await auth.register(req.body ?? {});
-      return res.status(201).json(await issueSession(res, result));
+      return res.status(201).json(await issueSession(req, res, result));
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);
@@ -115,7 +126,7 @@ export function createApp({
   app.post('/api/auth/login', async (req, res, next) => {
     try {
       const result = await auth.login(req.body ?? {});
-      return res.json(await issueSession(res, result));
+      return res.json(await issueSession(req, res, result));
     } catch (error) {
       if (clientError(res, error)) return undefined;
       return next(error);
@@ -124,15 +135,15 @@ export function createApp({
 
   app.post('/api/auth/logout', async (req, res, next) => {
     try {
-      await auth.logout(parseCookies(req.headers.cookie).sid);
-      res.setHeader('Set-Cookie', clearSessionCookie());
+      await auth.logout(sessionTokenFrom(req.headers.cookie));
+      res.setHeader('Set-Cookie', clearSessionCookie(cookieOpts(req)));
       return res.json({ user: null });
     } catch (error) { next(error); }
   });
 
   app.get('/api/auth/me', async (req, res, next) => {
     try {
-      const user = await auth.userFromToken(parseCookies(req.headers.cookie).sid);
+      const user = await auth.userFromToken(sessionTokenFrom(req.headers.cookie));
       return res.json({ user });
     } catch (error) { next(error); }
   });
@@ -140,7 +151,7 @@ export function createApp({
   app.use(async (req, res, next) => {
     if (!req.path.startsWith('/api')) return next();
     try {
-      req.user = await auth.userFromToken(parseCookies(req.headers.cookie).sid);
+      req.user = await auth.userFromToken(sessionTokenFrom(req.headers.cookie));
       if (isProtected(req) && !req.user) return res.status(401).json({ error: 'Sign in required' });
       return next();
     } catch (error) { next(error); }

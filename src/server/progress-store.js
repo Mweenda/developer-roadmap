@@ -1,6 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { nextReviewAt } from '../data/learning-model.js';
+import { createFileJsonIo } from './json-io.js';
 
 const DEFAULT_USER = 'default';
 
@@ -47,12 +46,13 @@ function sanitizeReviews(value, validIds) {
   return reviews;
 }
 
-export function createProgressStore(filePath, validPhaseIds, catalog = {}) {
+export function createProgressStore(filePath, validPhaseIds, catalog = {}, { jsonIo } = {}) {
   const validIds = new Set(validPhaseIds);
   const validTopicIds = new Set(catalog.topicIds ?? []);
   const validExerciseIds = new Set(catalog.exerciseIds ?? []);
   const validQuizIds = new Set(catalog.quizIds ?? validPhaseIds);
   let writeQueue = Promise.resolve();
+  const io = jsonIo ?? createFileJsonIo(filePath);
 
   function invalid(code, message) {
     const error = new Error(message);
@@ -117,20 +117,13 @@ export function createProgressStore(filePath, validPhaseIds, catalog = {}) {
   }
 
   async function readFileState() {
-    try {
-      return parseFile(JSON.parse(await readFile(filePath, 'utf8')));
-    } catch (error) {
-      if (error.code === 'ENOENT') return { byUser: {} };
-      throw error;
-    }
+    const parsed = await io.read();
+    if (!parsed) return { byUser: {} };
+    return parseFile(parsed);
   }
 
   async function writeFileState(next) {
-    await mkdir(dirname(filePath), { recursive: true });
-    const tempPath = `${filePath}.tmp`;
-    await writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-    await rename(tempPath, filePath);
-    return next;
+    return io.write(next);
   }
 
   function enqueue(work) {
