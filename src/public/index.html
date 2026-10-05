@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14182c"><title>Fieldnotes — Developer Roadmap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="app-aurora" aria-hidden="true"></div>
+  <aside class="sidebar"><a class="brand" href="#/"><span class="brand-mark">{ }</span><span><b>fieldnotes</b><small>developer apprenticeship</small></span></a>
+    <p class="nav-label">YOUR WORKSPACE</p>
+    <nav id="sidebarNav">
+      <a data-nav="overview" href="#/">⌂ <span>Overview</span></a>
+      <a data-nav="roadmap" href="#/roadmap">▤ <span>Roadmap</span></a>
+      <a data-nav="journal" href="#/journal">✎ <span>Journal</span></a>
+      <a data-nav="map" href="#/map">◈ <span>Knowledge map</span></a>
+      <a data-nav="docs" href="#/docs">◎ <span>Reference library</span></a>
+      <a data-nav="projects" href="#/projects">▣ <span>Projects</span></a>
+      <a data-nav="git" href="#/git">⎇ <span>Git workflow</span></a>
+      <a data-nav="lab" href="#/lab">🪲 <span>Debug lab</span></a>
+      <a data-nav="habits" href="#/habits">⌘ <span>Engineering habits</span></a>
+      <a data-nav="profile" href="#/profile">☺ <span>Profile</span></a>
+    </nav>
+    <div class="sidebar-foot"><span class="tiny-label">YOUR MOMENTUM</span><div class="streak glass">✦ <b id="streak">0</b> phases finished<small>Lessons, exercises, and quizzes save on this server.</small></div></div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div>Apprenticeship <span>/</span> <b>Full-stack JavaScript</b></div>
+      <nav class="mobile-nav" aria-label="Mobile">
+        <a href="#/">Home</a>
+        <a href="#/roadmap">Roadmap</a>
+        <a href="#/journal">Journal</a>
+        <a href="#/lab">Lab</a>
+        <a href="#/docs">Library</a>
+      </nav>
+      <div id="avatar" class="avatar">?</div>
+    </header>
+    <div class="wrap">
+      <div id="notice" class="notice" role="status" hidden></div>
+      <div id="view"><div class="loading">Loading the apprenticeship…</div></div>
+    </div>
+  </main>
+</body>
+</html>
