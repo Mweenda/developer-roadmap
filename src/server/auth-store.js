@@ -49,6 +49,11 @@ export function parseCookies(header) {
   return cookies;
 }
 
+export function sessionShouldBeSecure(req, env = process.env) {
+  const proto = req?.headers?.['x-forwarded-proto'];
+  return Boolean(req?.secure || proto === 'https' || env.FUNCTION_TARGET || env.K_SERVICE || env.VERCEL);
+}
+
 export function sessionCookie(token, { secure = false } = {}) {
   const parts = [
     `__session=${encodeURIComponent(token)}`,

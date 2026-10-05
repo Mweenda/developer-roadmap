@@ -12,7 +12,7 @@ import { projects } from './data/projects.js';
 import { listLibrary, getLibrarySource } from './data/library.js';
 import { createProgressStore } from './server/progress-store.js';
 import { createJournalStore } from './server/journal-store.js';
-import { createAuthStore, sessionCookie, clearSessionCookie, sessionTokenFrom } from './server/auth-store.js';
+import { createAuthStore, sessionCookie, clearSessionCookie, sessionTokenFrom, sessionShouldBeSecure } from './server/auth-store.js';
 import { gradeQuiz, gradeChoiceExercise, gradeTerminalExercise } from './lib/grade.js';
 import { buildLearningSnapshot } from './lib/learning.js';
 import { scoreProject, REVIEW_CRITERIA } from './lib/project-review.js';
@@ -101,9 +101,7 @@ export function createApp({
   }
 
   function cookieOpts(req) {
-    const proto = req.headers['x-forwarded-proto'];
-    const secure = Boolean(req.secure || proto === 'https' || process.env.FUNCTION_TARGET || process.env.K_SERVICE);
-    return { secure };
+    return { secure: sessionShouldBeSecure(req) };
   }
 
   async function issueSession(req, res, result) {

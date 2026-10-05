@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "build": "pnpm build:css",
+    "build": "pnpm build:css && node scripts/sync-cdn-public.js",
     "build:css": "tailwindcss -i src/styles/input.css -o src/public/styles.css --minify",
     "test": "node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js"

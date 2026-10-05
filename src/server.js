@@ -8,8 +8,6 @@ import { createRuntimeData } from './server/cloud-data.js';
 const rootDir = dirname(fileURLToPath(import.meta.url));
 loadEnv(join(rootDir, '..', '.env'));
 
-const port = Number(process.env.PORT) || 3000;
-const host = process.env.HOST || (process.env.K_SERVICE ? '0.0.0.0' : '127.0.0.1');
 const runtime = await createRuntimeData();
 const ai = await startFieldnotesAi({
   enableTelemetry: process.env.ENABLE_FIREBASE_MONITORING === 'true' || process.env.ENABLE_FIREBASE_MONITORING === '1',
@@ -19,4 +17,11 @@ const app = createApp({
   storage: runtime.storage,
   ...runtime.options,
 });
-app.listen(port, host, () => console.log(`Developer roadmap running at http://${host}:${port} (${runtime.storage})`));
+
+export default app;
+
+if (!process.env.VERCEL) {
+  const port = Number(process.env.PORT) || 3000;
+  const host = process.env.HOST || (process.env.K_SERVICE ? '0.0.0.0' : '127.0.0.1');
+  app.listen(port, host, () => console.log(`Developer roadmap running at http://${host}:${port} (${runtime.storage})`));
+}

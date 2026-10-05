@@ -103,27 +103,35 @@ That is the test gate. GitHub Actions runs the same command on every push and pu
 | `test/account.test.js` | Profile is in the avatar menu, not the sidebar; Settings and Sign out live there too |
 | `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
 | `test/firebase-hosting.test.js` | Hosting rewrites `/api`; App Hosting uses Firestore; `__session` cookie |
+| `test/vercel.test.js` | Vercel Express entry; CDN `public/` copy; Firebase config kept as fallback |
 
 Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
 
 ## Deployment architecture
 
-Do **not** deploy a static-only Firebase Hosting site. That would drop `/api`.
+Do **not** deploy a static-only Firebase Hosting site. That would drop `/api`. Keep `firebase.json` as a fallback until a Vercel preview passes the smoke test.
 
 ```text
 GitHub `dev`
    → pnpm test && pnpm build
    → Node/Express (frontend + /api)
+        → Vercel (Express Function + CDN `public/`)   ← try this first, no Cloud Functions / Blaze
         → Firebase App Hosting (Cloud Run)  and/or
         → Hosting + Cloud Function rewrite for `/api/**`
    → Firestore for auth, progress, journal
 ```
 
-Local `pnpm dev` still uses `data/` and `journal/` on disk. Cloud Run and Cloud Functions set `FIELDNOTES_DATA=firestore` (see `apphosting.yaml`) so production-critical learner state is not the container filesystem.
+Local `pnpm dev` still uses `data/` and `journal/` on disk. Vercel sets `VERCEL=1` (see `server.js`); Cloud Run and Cloud Functions set `FIELDNOTES_DATA=firestore` (see `apphosting.yaml`) so production-critical learner state is not the container filesystem.
 
-Smoke-test after a live deploy: `/` (UI), `/api/health` (`storage` must be `firestore`, `api` true), register/login, then a progress write that survives a cold start.
+Vercel [deploys Express as one Function](https://vercel.com/docs/frameworks/backend/express) and serves `public/**` on the CDN (`express.static()` is ignored there). The Hobby plan is $0 for personal/non-commercial use.
 
-Cloud Functions and App Hosting require the Firebase **Blaze** plan. Enable billing for `fieldnotes-apprenticeship` before the first live deploy.
+Smoke-test after a preview deploy: `/` (UI), `/api/health` (`storage` must be `firestore`, `api` true), register/login (`__session` Secure cookie), a progress write, and a journal write that survive a cold start. If the preview URL returns 403, turn off Vercel Deployment Protection for that check.
+
+Point the Vercel project at the **`dev` branch**. Do not treat `main` as the live source until `dev` is merged.
+
+Cloud Functions and App Hosting require the Firebase **Blaze** plan. Prefer the Vercel preview before enabling billing for `fieldnotes-apprenticeship`.
+
+Vercel runtime secrets (dashboard, never git): `FIREBASE_SERVICE_ACCOUNT` (Admin JSON), `GOOGLE_GENAI_API_KEY` (tutor), `FIREBASE_PROJECT_ID=fieldnotes-apprenticeship`.
 
 ## Ship gate
 
@@ -134,9 +142,13 @@ Whenever a feature is implemented successfully, ship it. Do not leave finished w
 3. If the build or `test/size.test.js` reports a public JS file over **32KB** or `src/public/styles.css` over **48KB**, **stop**. Split `src/public` into smaller ES modules until every chunk is under the limit and the suite is green. Do not raise the size cap to make the error go away.
 4. Commit on **`dev`** (never `.env`, `data/users.json`, or API keys).
 5. Push to GitHub: `git push -u origin HEAD`.
-6. Deploy only a Node/Express target that still serves `/api` (App Hosting and/or Hosting + the `api` function). Never a static-only `public/` folder.
+6. Deploy a Node/Express target that still serves `/api`. Prefer a Vercel preview (`vercel` / Git `dev`). Keep Firebase Hosting + the `api` function as fallback. Never a static-only `public/` folder without Express.
 
 ```sh
+# Vercel preview (Hobby). Set FIREBASE_SERVICE_ACCOUNT in the project env first.
+vercel
+
+# Firebase fallback (needs Blaze):
 firebase deploy --only hosting,functions,firestore --project fieldnotes-apprenticeship
 ```
 

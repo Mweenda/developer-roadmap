@@ -2,8 +2,10 @@ node_modules/
 data/progress.json
 data/users.json
 journal/
+/public/
 *.tmp
 .env
 .env.local
+.vercel
 firebase-debug.log
 firestore-debug.log

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAuthStore, sessionCookie, parseCookies } from '../src/server/auth-store.js';
+import { createAuthStore, sessionCookie, parseCookies, sessionShouldBeSecure } from '../src/server/auth-store.js';
 import { createProgressStore } from '../src/server/progress-store.js';
 import { createMemoryJsonIo, createJournalFileMap } from '../src/server/json-io.js';
 import { createRuntimeData, isCloudRuntime } from '../src/server/cloud-data.js';
@@ -36,6 +36,9 @@ test('session cookies use __session so Firebase Hosting forwards them to the API
   assert.match(header, /Secure/);
   assert.equal(parseCookies('__session=abc123; other=1').__session, 'abc123');
   assert.equal(parseCookies('sid=legacy').sid, 'legacy');
+  assert.equal(sessionShouldBeSecure({ headers: {} }, {}), false);
+  assert.equal(sessionShouldBeSecure({ headers: { 'x-forwarded-proto': 'https' } }, {}), true);
+  assert.equal(sessionShouldBeSecure({ headers: {} }, { VERCEL: '1' }), true);
 });
 
 test('auth and progress stores persist through injected JSON IO, not only local files', async () => {
@@ -63,6 +66,7 @@ test('cloud runtime uses Firestore; local runtime keeps disk files', async () =>
   assert.equal(isCloudRuntime({ FIELDNOTES_DATA: 'firestore' }), true);
   assert.equal(isCloudRuntime({ K_SERVICE: 'fieldnotes' }), true);
   assert.equal(isCloudRuntime({ FUNCTION_TARGET: 'api' }), true);
+  assert.equal(isCloudRuntime({ VERCEL: '1' }), true);
   const local = await createRuntimeData({ env: {} });
   assert.equal(local.storage, 'disk');
   assert.deepEqual(local.options, {});
@@ -76,6 +80,8 @@ test('cloud runtime uses Firestore; local runtime keeps disk files', async () =>
   assert.ok(cloud.options.authIo);
   assert.ok(cloud.options.progressIo);
   assert.ok(cloud.options.journalFileMap);
+  const vercel = await createRuntimeData({ firestore: fakeDb, env: { VERCEL: '1' } });
+  assert.equal(vercel.storage, 'firestore');
 });
 
 test('the live API still serves health and auth after the Firebase split', async (t) => {
