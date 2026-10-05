@@ -1,24 +1,19 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import { createApp } from './app.js';
 import { startFieldnotesAi } from './lib/genkit.js';
-import { createFirestoreJsonIo, createFirestoreJournalMap } from './server/json-io.js';
-
-if (!getApps().length) initializeApp();
+import { createRuntimeData } from './server/cloud-data.js';
 
 let handlerPromise;
 
 async function createHandler() {
-  const db = getFirestore();
+  const runtime = await createRuntimeData();
   const ai = await startFieldnotesAi({
     enableTelemetry: process.env.ENABLE_FIREBASE_MONITORING === 'true' || process.env.ENABLE_FIREBASE_MONITORING === '1',
   });
   return createApp({
     genkitGenerate: ai?.generate,
-    authIo: createFirestoreJsonIo(db.doc('fieldnotes/users')),
-    progressIo: createFirestoreJsonIo(db.doc('fieldnotes/progress')),
-    journalFileMap: createFirestoreJournalMap(db.doc('fieldnotes/journal')),
+    storage: runtime.storage,
+    ...runtime.options,
   });
 }
 

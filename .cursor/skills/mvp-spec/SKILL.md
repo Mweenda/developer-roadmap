@@ -38,5 +38,5 @@ Landing → Register/Login → Dashboard ("Start Phase 0.") → Roadmap → Phas
 ## After a change
 
 1. Update the milestone checkboxes in `skills.md`.
-2. Follow the **Ship gate** in `skills.md`: `pnpm test`, `pnpm build`, code-split any oversized public chunk, then commit and push `dev` to GitHub and deploy the Firebase Hosting live channel.
+2. Follow the **Ship gate** and **Deployment architecture** in `skills.md`. Never deploy static-only Hosting. `pnpm test`, `pnpm build`, code-split oversized chunks, then commit and push `dev`. Live deploy only after `/api` and Firestore-backed progress are in the target.
 3. Do not leave empty directories or unused imports.

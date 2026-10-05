@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createAuthStore, sessionCookie, parseCookies } from '../src/server/auth-store.js';
 import { createProgressStore } from '../src/server/progress-store.js';
 import { createMemoryJsonIo, createJournalFileMap } from '../src/server/json-io.js';
+import { createRuntimeData, isCloudRuntime } from '../src/server/cloud-data.js';
 import { startApp, frontendBundle } from './helpers.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,8 +16,12 @@ test('Firebase Hosting serves the UI and rewrites /api to the Express function',
   const hosting = json.hosting;
   assert.equal(hosting.public, 'src/public');
   const apiRewrite = hosting.rewrites.find((rule) => rule.source === '/api/**');
+  assert.ok(apiRewrite, 'Hosting must rewrite /api; do not ship a static-only site');
   const functionId = typeof apiRewrite.function === 'string' ? apiRewrite.function : apiRewrite.function.functionId;
   assert.equal(functionId, 'api');
+  const yaml = await readFile(join(root, 'apphosting.yaml'), 'utf8');
+  assert.match(yaml, /FIELDNOTES_DATA/);
+  assert.match(yaml, /value: firestore/);
   const rc = JSON.parse(await readFile(join(root, '.firebaserc'), 'utf8'));
   assert.equal(rc.projects.default, 'fieldnotes-apprenticeship');
   const ui = (await frontendBundle()).text;
@@ -52,10 +57,32 @@ test('journal file map round-trips markdown without touching disk', async () => 
   assert.deepEqual(await map.list(), ['README.md']);
 });
 
+test('cloud runtime uses Firestore; local runtime keeps disk files', async () => {
+  assert.equal(isCloudRuntime({}), false);
+  assert.equal(isCloudRuntime({ FIELDNOTES_DATA: 'firestore' }), true);
+  assert.equal(isCloudRuntime({ K_SERVICE: 'fieldnotes' }), true);
+  assert.equal(isCloudRuntime({ FUNCTION_TARGET: 'api' }), true);
+  const local = await createRuntimeData({ env: {} });
+  assert.equal(local.storage, 'disk');
+  assert.deepEqual(local.options, {});
+  const fakeDb = {
+    doc() {
+      return { get: async () => ({ exists: false }), set: async () => undefined };
+    },
+  };
+  const cloud = await createRuntimeData({ firestore: fakeDb, env: { FIELDNOTES_DATA: 'firestore' } });
+  assert.equal(cloud.storage, 'firestore');
+  assert.ok(cloud.options.authIo);
+  assert.ok(cloud.options.progressIo);
+  assert.ok(cloud.options.journalFileMap);
+});
+
 test('the live API still serves health and auth after the Firebase split', async (t) => {
   const { call } = await startApp(t, { authed: false });
   const health = await (await call('/api/health')).json();
   assert.equal(health.ok, true);
+  assert.equal(health.storage, 'disk');
+  assert.equal(health.api, true);
   const registered = await call('/api/auth/register', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

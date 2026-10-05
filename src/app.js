@@ -63,6 +63,7 @@ export function createApp({
   geminiModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   geminiFetch = fetch,
   genkitGenerate = null,
+  storage = 'disk',
 } = {}) {
   const app = express();
   const progress = createProgressStore(progressPath, phases.map((phase) => phase.id), progressCatalog(), progressIo ? { jsonIo: progressIo } : {});
@@ -224,7 +225,14 @@ export function createApp({
   });
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ...buildHealth(startedAt), backup: 'Copy data/ and journal/ for a local snapshot.' });
+    res.json({
+      ...buildHealth(startedAt),
+      storage,
+      api: true,
+      backup: storage === 'firestore'
+        ? 'Progress, auth, and journal persist in Firestore.'
+        : 'Copy data/ and journal/ for a local snapshot.',
+    });
   });
 
   app.get('/api/sandbox', (_req, res) => {

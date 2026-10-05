@@ -102,9 +102,28 @@ That is the test gate. GitHub Actions runs the same command on every push and pu
 | `test/tutor.test.js` | Gemini tutor: chapter docs, no spoilers, auth, chatbot widget, `.env` ignored |
 | `test/account.test.js` | Profile is in the avatar menu, not the sidebar; Settings and Sign out live there too |
 | `test/exercise-lab.test.js` | Exercise briefing popup, sandboxed terminal grading, Genkit/Firebase env |
-| `test/firebase-hosting.test.js` | Hosting serves the UI; `/api` rewrites to Express; `__session` cookie |
+| `test/firebase-hosting.test.js` | Hosting rewrites `/api`; App Hosting uses Firestore; `__session` cookie |
 
 Watch mode: `pnpm test:watch`. Rebuild CSS before a production start: `pnpm build`.
+
+## Deployment architecture
+
+Do **not** deploy a static-only Firebase Hosting site. That would drop `/api`.
+
+```text
+GitHub `dev`
+   → pnpm test && pnpm build
+   → Node/Express (frontend + /api)
+        → Firebase App Hosting (Cloud Run)  and/or
+        → Hosting + Cloud Function rewrite for `/api/**`
+   → Firestore for auth, progress, journal
+```
+
+Local `pnpm dev` still uses `data/` and `journal/` on disk. Cloud Run and Cloud Functions set `FIELDNOTES_DATA=firestore` (see `apphosting.yaml`) so production-critical learner state is not the container filesystem.
+
+Smoke-test after a live deploy: `/` (UI), `/api/health` (`storage` must be `firestore`, `api` true), register/login, then a progress write that survives a cold start.
+
+Cloud Functions and App Hosting require the Firebase **Blaze** plan. Enable billing for `fieldnotes-apprenticeship` before the first live deploy.
 
 ## Ship gate
 
@@ -115,13 +134,11 @@ Whenever a feature is implemented successfully, ship it. Do not leave finished w
 3. If the build or `test/size.test.js` reports a public JS file over **32KB** or `src/public/styles.css` over **48KB**, **stop**. Split `src/public` into smaller ES modules until every chunk is under the limit and the suite is green. Do not raise the size cap to make the error go away.
 4. Commit on **`dev`** (never `.env`, `data/users.json`, or API keys).
 5. Push to GitHub: `git push -u origin HEAD`.
-6. Deploy the Hosting **live** channel and the Express API Cloud Function for `fieldnotes-apprenticeship`:
+6. Deploy only a Node/Express target that still serves `/api` (App Hosting and/or Hosting + the `api` function). Never a static-only `public/` folder.
 
 ```sh
-firebase deploy --only hosting,functions --project fieldnotes-apprenticeship
+firebase deploy --only hosting,functions,firestore --project fieldnotes-apprenticeship
 ```
-
-Cloud Functions (the Express `/api` server) require the Firebase **Blaze** plan. Enable billing for `fieldnotes-apprenticeship` before this deploy, then Hosting serves `src/public` and `/api/**` is rewritten to the `api` function on the same origin.
 
 ## Housekeeping
 
